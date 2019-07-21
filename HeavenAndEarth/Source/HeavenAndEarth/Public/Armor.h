@@ -12,6 +12,7 @@ struct FArmorLayer {
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) int32 maxCondition;
 	static void damage(FArmorLayer layer, uint32 dmg);
 	static void repair(FArmorLayer layer, uint32 rep);
+	static void repairPercentage(FArmorLayer layer, uint8 percent);
 };
 
 USTRUCT(BlueprintType)

@@ -94,9 +94,9 @@ void AUnit::attack(AUnit* attacker, BodyPart bodyPart, int32 dmg, int32 power, u
 		for (uint8 j = 0; j < armor.pieces[i].layers.Num(); j++) {
 			FArmorLayer layer = armor.pieces[i].layers[j];
 			p -= layer.protection;
-			FArmorLayer::damage(layer, FMath::Max(p, MAX_CONDITION_POWER_MULT));
+			FArmorLayer::damage(layer, FMath::Max(p, GameLib::maxConditionPowerMult));
 		}
-		int32 critThreshold = attacker->critical ? CRIT_TALENT_POWER_NEEDED : CRIT_POWER_NEEDED;
+		int32 critThreshold = attacker->critical ? GameLib::critTalentPowerNeeded : GameLib::critPowerNeeded;
 		if (p >= critThreshold) {
 			l += 1;
 		}

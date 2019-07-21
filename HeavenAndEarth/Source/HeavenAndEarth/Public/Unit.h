@@ -35,7 +35,9 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated) FArmor torsoArmor;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated) FArmor armArmor;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated) FArmor legArmor;
-	//tags
+	//stats
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated) int32 baseDamage;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated) int32 basePower;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated) bool critical;
 	//functions
 	virtual void BeginPlay() override;

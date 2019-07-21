@@ -14,3 +14,8 @@ void FArmorLayer::repair(FArmorLayer layer, uint32 rep)
 	if (layer.condition > layer.maxCondition) layer.condition = layer.maxCondition;
 	layer.protection = layer.baseProtection * layer.condition / layer.maxCondition;
 }
+
+void FArmorLayer::repairPercentage(FArmorLayer layer, uint8 percent)
+{
+	repair(layer, layer.maxCondition * percent / 100);
+}
