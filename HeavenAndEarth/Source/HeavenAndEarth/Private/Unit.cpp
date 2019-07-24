@@ -17,31 +17,41 @@ void AUnit::BeginPlay()
 	
 }
 
-void AUnit::damage(int32 dmg, uint8 lethality)
+void AUnit::damageSoldiers(float dmg, uint8 lethality)
 {
-	morale -= dmg * lethality;
-	if (morale <= 0) morale = 0;
 	float aliveTotal = crippled + wounded + healthy;
-	//healthy
-	healthy -= dmg * healthy / aliveTotal;
+	damageHealthy(dmg * healthy / aliveTotal, lethality);
+	damageWounded(dmg * wounded / aliveTotal, lethality);
+	damageCrippled(dmg * crippled / aliveTotal, lethality);
+}
+
+void AUnit::damageCrippled(float dmg, uint8 lethality)
+{
+	crippled -= dmg;
 	switch (lethality) {
 	case 0: break;
-	case 1: wounded += dmg * healthy / aliveTotal; break;
-	case 2: crippled += dmg * healthy / aliveTotal; break;
-	default: dead += dmg * healthy / aliveTotal; break;
+	default: dead += dmg;
 	}
-	//wounded
-	wounded -= dmg * wounded / aliveTotal;
+}
+
+void AUnit::damageWounded(float dmg, uint8 lethality)
+{
+	wounded -= dmg;
 	switch (lethality) {
 	case 0: break;
-	case 1: crippled += dmg * wounded / aliveTotal; break;
-	default: dead += dmg * wounded / aliveTotal; break;
+	case 1: crippled += dmg;
+	default: dead += dmg;
 	}
-	//crippled
-	crippled -= dmg * crippled / aliveTotal;
+}
+
+void AUnit::damageHealthy(float dmg, uint8 lethality)
+{
+	healthy -= dmg;
 	switch (lethality) {
 	case 0: break;
-	default: dead += dmg * crippled / aliveTotal; break;
+	case 1: wounded += dmg;
+	case 2: crippled += dmg;
+	default: dead += dmg;
 	}
 }
 
@@ -66,7 +76,7 @@ void AUnit::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimePro
 	DOREPLIFETIME(AUnit, maxStamina);
 }
 
-void AUnit::attack(AUnit* attacker, BodyPart bodyPart, int32 dmg, int32 power, uint8 lethality)
+void AUnit::attack(AUnit* attacker, BodyPart bodyPart, float dmg, float power, uint8 lethality)
 {
 	FArmor armor;
 	switch (bodyPart) {
@@ -88,19 +98,20 @@ void AUnit::attack(AUnit* attacker, BodyPart bodyPart, int32 dmg, int32 power, u
 		return;
 	}
 	for (uint8 i = 0; i < armor.pieces.Num(); i++) {
-		int32 d = dmg * armor.pieces[i].coverage;
-		int32 p = power;
+		float d = dmg * armor.pieces[i].coverage;
+		float p = power;
 		uint8 l = lethality;
 		for (uint8 j = 0; j < armor.pieces[i].layers.Num(); j++) {
 			FArmorLayer layer = armor.pieces[i].layers[j];
 			p -= layer.protection;
-			FArmorLayer::damage(layer, FMath::Max(p, GameLib::maxConditionPowerMult));
+			FArmorLayer::damage(layer, 
+				FMath::Max(d * FMath::Pow(p + GameLib::conditionDamagePowerBonus, GameLib::conditionDamageExponent), GameLib::maxConditionPowerMult));
 		}
 		int32 critThreshold = attacker->critical ? GameLib::critTalentPowerNeeded : GameLib::critPowerNeeded;
 		if (p >= critThreshold) {
 			l += 1;
 		}
-		if(p >= 0) damage(d, l);
+		if(p >= 0.0f) damageSoldiers(d, l);
 	}
 }
 

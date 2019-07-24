@@ -41,10 +41,13 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated) bool critical;
 	//functions
 	virtual void BeginPlay() override;
-	UFUNCTION() void damage(int32 dmg, uint8 lethality);
+	UFUNCTION() void damageSoldiers(float dmg, uint8 lethality);
+	UFUNCTION() void damageCrippled(float dmg, uint8 lethality);
+	UFUNCTION() void damageWounded(float dmg, uint8 lethality);
+	UFUNCTION() void damageHealthy(float dmg, uint8 lethality;
 public:	
 	AUnit();
 	virtual void Tick(float DeltaTime) override;
 	virtual void GetLifetimeReplicatedProps(TArray< FLifetimeProperty >& OutLifetimeProps) const override;
-	UFUNCTION() void attack(AUnit* attacker, BodyPart bodyPart, int32 dmg, int32 power, uint8 lethality);
+	UFUNCTION() void attack(AUnit* attacker, BodyPart bodyPart, float dmg, float power, uint8 lethality);
 };

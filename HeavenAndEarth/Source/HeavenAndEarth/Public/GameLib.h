@@ -8,6 +8,11 @@ enum class BodyPart : uint8 {
 	Head, Torso, Arms, Legs
 };
 
+UENUM(BlueprintType)
+enum class Perk : uint8 {
+
+};
+
 USTRUCT(BlueprintType)
 struct FGridIndex {
 	GENERATED_BODY()
@@ -24,7 +29,9 @@ struct FGridIndex {
 };
 
 namespace GameLib {
-	const int32 maxConditionPowerMult = 5;
+	const float conditionDamagePowerBonus = 5.0f;
+	const float maxConditionPowerMult = 20.0f;
+	const float conditionDamageExponent = 1.5f;
 	const int32 critPowerNeeded = 8;
 	const int32 critTalentPowerNeeded = 5;
 	const int32 glancingPowerNeeded = 5;
