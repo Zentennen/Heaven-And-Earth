@@ -1,25 +1,22 @@
 #include "Game.h"
 #include "UnrealNetwork.h"
 #include "AStar.h"
+#include "Engine.h"
+#include "..\Public\Game.h"
 
 AGame* AGame::game;
 
 AGame::AGame()
 {
 	PrimaryActorTick.bCanEverTick = false;
-	tiles.Init(FCostColumn(GameLib::mapY), GameLib::mapX);
+	tiles.Init(FTileColumn(GameLib::mapY), GameLib::mapX);
 }
 
 void AGame::BeginPlay()
 {
 	Super::BeginPlay();
-	if (!game) {
-		game = this;
-		//for (uint8 i = 0; i < tiles.Num(); i++) for (uint8 j = 0; j < tiles[i].tiles.Num(); j++) {
-		//	tiles[i][j].pos = FGridIndex(i, j);
-		//}
-	}
-	else Destroy();
+	game = this;
+	debugStr("AGame::game set");
 }
 
 void AGame::Tick(float DeltaTime)
@@ -33,6 +30,44 @@ void AGame::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimePro
 	DOREPLIFETIME(AGame, tiles);
 }
 
+bool AGame::addUnit(AUnit* unit)
+{
+	if (!game) {
+		debugStr("ERROR: AGame::addUnit(): no game pointer");
+		return false;
+	}
+	if (!unit) {
+		debugStr("ERROR: AGame::addUnit(): no unit pointer");
+		return false;
+	}
+	game->units.Emplace(unit);
+	return true;
+}
+
+bool AGame::addPC(APC* pc)
+{
+	if (!game) {
+		debugStr("ERROR: AGame::addPC(): no game pointer");
+		return false;
+	}
+	if (!pc) {
+		debugStr("ERROR: AGame::addPC(): no pc pointer");
+		return false;
+	}
+	game->pcs.Emplace(pc);
+	return true;
+}
+
+void AGame::executeTurn()
+{
+	if (!HasAuthority()) return;
+	for (auto i : units) i->beginTurn();
+	for (auto i : pcs) i->beginTurn();
+	//TODO: ...
+	for (auto i : units) i->endTurn();
+	for (auto i : pcs) i->endTurn();
+}
+
 bool AGame::isValidPos(const FGridIndex& pos)
 {
 	if (pos.x < 0 || pos.x >= GameLib::mapX || pos.y < 0 || pos.y >= GameLib::mapY) return false;
@@ -42,44 +77,30 @@ bool AGame::isValidPos(const FGridIndex& pos)
 FTile AGame::getTile(const FGridIndex& tilePos)
 {
 	if (!isValidPos(tilePos)) return FTile();
-	return FTile(game->tiles[tilePos.x].costs[tilePos.y], tilePos, getTilePropertiesFromFlags(game->tiles[tilePos.x].flags[tilePos.y]));
-}
-
-FGridIndex AGame::directionToGridIndex(const HexDirection& dir)
-{
-	switch (dir) {
-	case HexDirection::Right:
-		return FGridIndex(1, 0);
-	case HexDirection::DownRight:
-		return FGridIndex(1, -1);
-	case HexDirection::DownLeft:
-		return FGridIndex(0, -1);
-	case HexDirection::Left:
-		return FGridIndex(-1, 0);
-	case HexDirection::UpLeft:
-		return FGridIndex(-1, 1);
-	case HexDirection::UpRight:
-		return FGridIndex(0, 1);
-	default:
-		return FGridIndex(0, 0);
-	}
+	uint8 cost = game->tiles[tilePos.x].costs[tilePos.y];
+	auto props = getTilePropertiesFromFlags(game->tiles[tilePos.x].flags[tilePos.y]);
+	return FTile(cost, tilePos, props);
 }
 
 FGridIndex AGame::movementToGridIndex(const HexDirection& dir, FGridIndex pos)
 {
 	switch (dir) {
-	case HexDirection::Right:
-		return pos + FGridIndex(1, 0);
-	case HexDirection::DownRight:
-		return pos + FGridIndex(1, -1);
-	case HexDirection::DownLeft:
-		return pos + FGridIndex(0, -1);
+	case HexDirection::UpLeft:
+		if (pos.y % 2 == 0) return pos + FGridIndex(0, 1);
+		else return pos + FGridIndex(-1, 1);
+	case HexDirection::UpRight:
+		if (pos.y % 2 == 0) return pos + FGridIndex(1, 1);
+		else return pos + FGridIndex(0, 1);
 	case HexDirection::Left:
 		return pos + FGridIndex(-1, 0);
-	case HexDirection::UpLeft:
-		return pos + FGridIndex(-1, 1);
-	case HexDirection::UpRight:
-		return pos + FGridIndex(0, 1);
+	case HexDirection::Right:
+		return pos + FGridIndex(1, 0);
+	case HexDirection::DownLeft:
+		if (pos.y % 2 == 0) return pos + FGridIndex(0, -1);
+		else return pos + FGridIndex(-1, -1);
+	case HexDirection::DownRight:
+		if (pos.y % 2 == 0) return pos + FGridIndex(1, -1);
+		else return pos + FGridIndex(0, -1);
 	default:
 		return pos;
 	}
@@ -89,8 +110,23 @@ TArray<TileProperty> AGame::getTilePropertiesFromFlags(const uint8& flags)
 {
 	TArray<TileProperty> properties;
 	properties.Empty();
-	//...
+	//TODO: implement
 	return properties;
+}
+
+uint8 AGame::getFlagsFromTileProperties(const TArray<TileProperty>& props)
+{
+	//TODO: Implement
+	return 0;
+}
+
+bool AGame::setTile(const FTile& t)
+{
+	if (!isValidPos(t.pos)) return false;
+	game->tiles[t.pos.x].costs[t.pos.y] = t.cost;
+	game->tiles[t.pos.x].units[t.pos.y] = t.unit;
+	game->tiles[t.pos.x].flags[t.pos.y] = getFlagsFromTileProperties(t.properties);
+	return true;
 }
 
 TArray<FGridIndex> AGame::getPathAsGridIndices(const FGridIndex& start, const FGridIndex& goal, const int32& maxMove)
@@ -98,12 +134,9 @@ TArray<FGridIndex> AGame::getPathAsGridIndices(const FGridIndex& start, const FG
 	TArray<FGridIndex> ret;
 	ret.Empty();
 	auto path = AStar::getPath(start, goal, maxMove);
-	if (path) {
+	while (path) {
 		ret.Emplace(path->tile.pos);
-		while (path->parent) {
-			ret.Emplace(path->tile.pos);
-			path = path->parent;
-		}
+		path = path->parent;
 	}
 	return ret;
 }
@@ -198,4 +231,20 @@ FRotator AGame::hexDirectionToRotation(const HexDirection& dir)
 		break;
 	}
 	return FRotator(0.0f, yaw, 0.0f);
+}
+
+bool AGame::gridIndicesToHexDirection(const FGridIndex& base, const FGridIndex& other, HexDirection& dir)
+{
+	for (uint8 i = 0; i < 6; i++) {
+		if (other - base == movementToGridIndex((HexDirection)i, base)) {
+			dir = (HexDirection)i;
+			return true;
+		}
+	}
+	return false;
+}
+
+FString AGame::gridIndexToString(const FGridIndex& gridIndex)
+{
+	return gridIndex;
 }

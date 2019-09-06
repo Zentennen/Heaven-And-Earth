@@ -1,9 +1,18 @@
 #pragma once
 #include "CoreMinimal.h"
-//#include "GameFramework\Actor.h"
 #include "GameLib.generated.h"
 
 #define INVALID_GI FGridIndex(-1, -1)
+
+#define debugInt(x) if(GEngine) { FString fstr = FString::FromInt(x); GEngine->AddOnScreenDebugMessage(-1, 5, FColor::Purple, *fstr); }
+#define debugStr(x) if(GEngine) { GEngine->AddOnScreenDebugMessage(-1, 5, FColor::Purple, TEXT(x)); }
+#define debugFstr(x) if(GEngine) { GEngine->AddOnScreenDebugMessage(-1, 5, FColor::Purple, x); }
+#define debugBool(x) if(GEngine) { GEngine->AddOnScreenDebugMessage(-1, 5, FColor::Purple, x? TEXT("true") : TEXT("false")); }
+#define debugFloat(x) if(GEngine) { FString fstr = FString::SanitizeFloat(x); GEngine->AddOnScreenDebugMessage(-1, 5, FColor::Purple, *fstr); }
+#define debugVec(x) if(GEngine) { FString fstr = x.ToString(); GEngine->AddOnScreenDebugMessage(-1, 5, FColor::Purple, *fstr); }
+#define debugGI(a) if(GEngine) { FString fstr = TEXT("(") + FString::FromInt(a.x) + TEXT(", ") + FString::FromInt(a.y) + TEXT(")"); GEngine->AddOnScreenDebugMessage(-1, 5, FColor::Purple, *fstr); }
+
+class AUnit;
 
 UENUM(BlueprintType)
 enum class BodyPart : uint8 {
@@ -52,6 +61,13 @@ struct FGridIndex {
 		y -= other.y;
 		return *this;
 	}
+	//operator FString& () {
+	//	FString fstr = TEXT("(") + FString::FromInt(x) + TEXT(", ") + FString::FromInt(y) + TEXT(")");
+	//	return fstr;
+	//}
+	operator FString() const {
+		return TEXT("(") + FString::FromInt(x) + TEXT(", ") + FString::FromInt(y) + TEXT(")");
+	}
 	friend uint32 GetTypeHash(const FGridIndex& other) {
 		FVector2D v(other.x, other.y);
 		return GetTypeHash(v);
@@ -74,6 +90,7 @@ struct FTile {
 	GENERATED_BODY()
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) uint8 cost;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) FGridIndex pos;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere) AUnit* unit;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) TArray<TileProperty> properties;
 	FTile() : cost(1), pos(INVALID_GI) {
 		properties.Empty();
@@ -110,4 +127,9 @@ namespace GameLib {
 	const float hexY = hexSize * sin60;
 	const float third = 1.0f / 3.0f;
 	const float twoThirds = 2.0f / 3.0f;
+	template<typename To, typename From> To* castStruct(From* base)
+	{
+		static_assert(TIsDerivedFrom<To, From>::IsDerived, "To has to be derived from From.");
+		return static_cast<To*>(base);
+	}
 }

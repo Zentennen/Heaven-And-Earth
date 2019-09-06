@@ -1,4 +1,5 @@
 #include "Unit.h"
+#include "Game.h"
 #include "UnrealNetwork.h"
 #include "..\Public\Unit.h"
 
@@ -14,7 +15,10 @@ AUnit::AUnit()
 void AUnit::BeginPlay()
 {
 	Super::BeginPlay();
-	
+	if (!HasAuthority()) return;
+	AGame::addUnit(this);
+	position = AGame::vectorToGridIndex(GetActorLocation());
+	SetActorLocation(AGame::gridIndexToVector(position));
 }
 
 void AUnit::damageSoldiers(const float& dmg, const uint8& lethality)
@@ -55,6 +59,18 @@ void AUnit::damageHealthy(const float& dmg, const uint8& lethality)
 	}
 }
 
+void AUnit::addOrders(TArray<Order> newOrders)
+{
+	orders.Append(newOrders);
+	onOrdersChanged();
+}
+
+void AUnit::replaceOrders(TArray<Order> newOrders)
+{
+	orders = newOrders;
+	onOrdersChanged();
+}
+
 void AUnit::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -63,6 +79,14 @@ void AUnit::Tick(float DeltaTime)
 
 void AUnit::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
+	DOREPLIFETIME(AUnit, name);
+	DOREPLIFETIME(AUnit, team);
+	DOREPLIFETIME(AUnit, controller);
+	DOREPLIFETIME(AUnit, position);
+	DOREPLIFETIME(AUnit, direction);
+	DOREPLIFETIME(AUnit, movementSpeed);
+	DOREPLIFETIME(AUnit, maxFormationStrength);
+	DOREPLIFETIME(AUnit, formationStrength);
 	DOREPLIFETIME(AUnit, dead);
 	DOREPLIFETIME(AUnit, crippled);
 	DOREPLIFETIME(AUnit, wounded);
@@ -74,12 +98,29 @@ void AUnit::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimePro
 	DOREPLIFETIME(AUnit, stamina);
 	DOREPLIFETIME(AUnit, staminaLimit);
 	DOREPLIFETIME(AUnit, maxStamina);
+	DOREPLIFETIME(AUnit, headArmor);
+	DOREPLIFETIME(AUnit, torsoArmor);
+	DOREPLIFETIME(AUnit, armArmor);
+	DOREPLIFETIME(AUnit, legArmor);
+	DOREPLIFETIME(AUnit, baseDamage);
+	DOREPLIFETIME(AUnit, basePower);
+	DOREPLIFETIME(AUnit, perks);
 }
 
-void AUnit::attack(AUnit* attacker, BodyPart bodyPart, float dmg, float power, uint8 lethality, const float& critChance)
+void AUnit::beginTurn()
 {
-	if (critChance >= FMath::FRandRange(0.0f, 1.0f)) {
-		attack(attacker, bodyPart, dmg, power, lethality, 0.0f);
+
+}
+
+void AUnit::endTurn()
+{
+
+}
+
+void AUnit::attack(const AUnit* attacker, const BodyPart& bodyPart, float dmg, float power, uint8 lethality, const float& critRatio)
+{
+	if (critRatio > 0.0f) {
+		attack(attacker, bodyPart, dmg * critRatio, power, lethality, 0.0f);
 	}
 	FArmor armor;
 	switch (bodyPart) {
@@ -117,3 +158,48 @@ void AUnit::attack(AUnit* attacker, BodyPart bodyPart, float dmg, float power, u
 	}
 }
 
+void AUnit::executeOrder()
+{
+	
+}
+
+void AUnit::moveAlongPath(const TArray<FGridIndex>& path, const bool& replaceCurrentOrders)
+{
+	if (path.Num() == 0) return;
+	FGridIndex pos = position;
+	HexDirection dir = direction;
+	HexDirection temp;
+	TArray<Order> newOrders;
+	for (auto i : path) {
+		if (AGame::gridIndicesToHexDirection(pos, i, temp)) {
+			auto o = getRotationOrdersTo(dir, temp);
+			newOrders.Append(o);
+			newOrders.Emplace(Order::Move);
+			pos = i;
+			dir = temp;
+		}
+		else {
+			FString fstr(" received invalid path to move along.");
+			debugFstr(name + fstr);
+			return;
+		}
+	}
+	if (replaceCurrentOrders) replaceOrders(newOrders);
+	else addOrders(newOrders);
+}
+
+TArray<Order> AUnit::getRotationOrdersTo(const HexDirection& start, const HexDirection& goal)
+{
+	TArray<Order> ret;
+	ret.Empty();
+	int32 diff = ((int32)goal - (int32)start) % 6;
+	while (diff > 0) {
+		ret.Emplace(Order::Rotate);
+		diff--;
+	}
+	while (diff < 0) {
+		ret.Emplace(Order::CounterRotate);
+		diff++;
+	}
+	return ret;
+}

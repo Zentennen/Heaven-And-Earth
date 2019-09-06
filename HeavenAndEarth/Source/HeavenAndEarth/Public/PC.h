@@ -1,8 +1,6 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
-#include "CoreMinimal.h"
+#include "GameLib.h"
 #include "GameFramework/PlayerController.h"
 #include "PC.generated.h"
 
@@ -24,5 +22,13 @@ protected:
 	UFUNCTION(BlueprintCallable) void action();
 	UFUNCTION(BlueprintCallable) void createUnit(const FVector& location);
 	UFUNCTION(BlueprintCallable) void selectUnit(AUnit* u);
+	UFUNCTION(BlueprintCallable) void unselect();
+	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation) void moveCommand(AUnit* u, FGridIndex destination, bool replaceCurrentOrders);
 	UFUNCTION(BlueprintImplementableEvent) void onSelect(AUnit* selectedUnit);
+	UFUNCTION(BlueprintImplementableEvent) void onUnselect();
+	UFUNCTION(Client, Unreliable) void updatePath(const TArray<FGridIndex>& path);
+public:
+	void beginTurn();
+	void endTurn();
+	UFUNCTION(BlueprintImplementableEvent) void bUpdatePath(const TArray<FGridIndex>& path);
 };
