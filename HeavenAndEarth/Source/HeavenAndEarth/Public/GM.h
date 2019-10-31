@@ -13,5 +13,5 @@ UCLASS()
 class HEAVENANDEARTH_API AGM : public AGameModeBase
 {
 	GENERATED_BODY()
-	
+	virtual void PostLogin(APlayerController* NewPlayer) override;
 };

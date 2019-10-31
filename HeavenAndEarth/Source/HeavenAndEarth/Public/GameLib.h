@@ -3,16 +3,22 @@
 #include "GameLib.generated.h"
 
 #define INVALID_GI FGridIndex(-1, -1)
-
-#define debugInt(x) if(GEngine) { FString fstr = FString::FromInt(x); GEngine->AddOnScreenDebugMessage(-1, 5, FColor::Purple, *fstr); }
-#define debugStr(x) if(GEngine) { GEngine->AddOnScreenDebugMessage(-1, 5, FColor::Purple, TEXT(x)); }
-#define debugFstr(x) if(GEngine) { GEngine->AddOnScreenDebugMessage(-1, 5, FColor::Purple, x); }
-#define debugBool(x) if(GEngine) { GEngine->AddOnScreenDebugMessage(-1, 5, FColor::Purple, x? TEXT("true") : TEXT("false")); }
-#define debugFloat(x) if(GEngine) { FString fstr = FString::SanitizeFloat(x); GEngine->AddOnScreenDebugMessage(-1, 5, FColor::Purple, *fstr); }
-#define debugVec(x) if(GEngine) { FString fstr = x.ToString(); GEngine->AddOnScreenDebugMessage(-1, 5, FColor::Purple, *fstr); }
-#define debugGI(a) if(GEngine) { FString fstr = TEXT("(") + FString::FromInt(a.x) + TEXT(", ") + FString::FromInt(a.y) + TEXT(")"); GEngine->AddOnScreenDebugMessage(-1, 5, FColor::Purple, *fstr); }
+#define INVALID_TILE Tile()
+#define DEBUG_TEXT_TIME 20
+#define debugInt(x) if(GEngine) { FString fstr = FString::FromInt(x); GEngine->AddOnScreenDebugMessage(-1, DEBUG_TEXT_TIME, FColor::Purple, *fstr); }
+#define debugStr(x) if(GEngine) { GEngine->AddOnScreenDebugMessage(-1, DEBUG_TEXT_TIME, FColor::Purple, TEXT(x)); }
+#define debugFstr(x) if(GEngine) { GEngine->AddOnScreenDebugMessage(-1, DEBUG_TEXT_TIME, FColor::Purple, x); }
+#define debugBool(x) if(GEngine) { GEngine->AddOnScreenDebugMessage(-1, DEBUG_TEXT_TIME, FColor::Purple, x? TEXT("true") : TEXT("false")); }
+#define debugFloat(x) if(GEngine) { FString fstr = FString::SanitizeFloat(x); GEngine->AddOnScreenDebugMessage(-1, DEBUG_TEXT_TIME, FColor::Purple, *fstr); }
+#define debugVec(x) if(GEngine) { FString fstr = x.ToString(); GEngine->AddOnScreenDebugMessage(-1, DEBUG_TEXT_TIME, FColor::Purple, *fstr); }
+#define debugGI(a) if(GEngine) { FString fstr = TEXT("(") + FString::FromInt(a.x) + TEXT(", ") + FString::FromInt(a.y) + TEXT(")"); GEngine->AddOnScreenDebugMessage(-1, DEBUG_TEXT_TIME, FColor::Purple, *fstr); }
 
 class AUnit;
+
+UENUM(BlueprintType)
+enum class Order : uint8 {
+	Rest, Move, Rotate, CounterRotate
+};
 
 UENUM(BlueprintType)
 enum class BodyPart : uint8 {
@@ -21,7 +27,7 @@ enum class BodyPart : uint8 {
 
 UENUM(BlueprintType)
 enum class Perk : uint8 {
-	Ruthless
+	Ruthless, Swift, Resolute, Precise, Steadfast, Stalwart, Tough
 };
 
 UENUM(BlueprintType)
@@ -59,6 +65,11 @@ struct FGridIndex {
 	FGridIndex& operator-=(const FGridIndex& other) {
 		x -= other.x;
 		y -= other.y;
+		return *this;
+	}
+	FGridIndex& operator*=(const int32& mult) {
+		x *= mult;
+		y *= mult;
 		return *this;
 	}
 	//operator FString& () {
@@ -113,11 +124,12 @@ struct FTile {
 };
 
 namespace GameLib {
-	const int32 strongHitPowerNeeded = 8;
-	const int32 strongHitTalentPowerNeeded = 5;
-	const int32 weakHitPowerNeeded = 5;
-	const int32 mapX = 100;
-	const int32 mapY = 100;
+	const uint8 strongHitPowerNeeded = 8;
+	const uint8 strongHitTalentPowerNeeded = 5;
+	const uint8 weakHitPowerNeeded = 5;
+	const uint8 mapX = 100;
+	const uint8 mapY = 100;
+	const uint8 rotationNeeded = 100;
 	const float conditionDamagePowerBonus = 5.0f;
 	const float torsoPowerMult = 1.1f;
 	const float hexSize = 100.0f;
@@ -127,9 +139,11 @@ namespace GameLib {
 	const float hexY = hexSize * sin60;
 	const float third = 1.0f / 3.0f;
 	const float twoThirds = 2.0f / 3.0f;
-	template<typename To, typename From> To* castStruct(From* base)
-	{
+	template<typename To, typename From> To* castStruct(From* base) {
 		static_assert(TIsDerivedFrom<To, From>::IsDerived, "To has to be derived from From.");
 		return static_cast<To*>(base);
+	}
+	template<typename T> T posMod(const T& value, const T& mod) {
+		return (value % mod + mod) % mod;
 	}
 }

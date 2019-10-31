@@ -13,6 +13,7 @@ public:
 	AScenery();
 
 protected:
+	bool initialized;
 	virtual void BeginPlay() override;
 
 public:	
@@ -20,4 +21,5 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) TArray<FTile> tiles;
 	virtual void Tick(float DeltaTime) override;
 	UFUNCTION(BlueprintCallable) void setPosition(const FGridIndex& gi);
+	UFUNCTION() void init();
 };

@@ -21,6 +21,8 @@ void AHexMarker::Tick(float DeltaTime)
 
 void AHexMarker::setPos(const FGridIndex& gi)
 {
-	SetActorLocation(AGame::gridIndexToVector(gi));
+	ETeleportType tele = ETeleportType::TeleportPhysics;
+	float f = markerType == MarkerType::Cursor ? 0.02f : 0.01f;
+	SetActorLocation(AGame::gridIndexToVector(gi, f), false, nullptr, tele);
 }
 

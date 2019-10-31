@@ -10,7 +10,6 @@ AScenery::AScenery()
 void AScenery::BeginPlay()
 {
 	Super::BeginPlay();
-	setPosition(AGame::vectorToGridIndex(GetActorLocation()));
 }
 
 void AScenery::Tick(float DeltaTime)
@@ -21,11 +20,18 @@ void AScenery::Tick(float DeltaTime)
 
 void AScenery::setPosition(const FGridIndex& gi)
 {
-	center = gi;
+
+}
+
+void AScenery::init()
+{
+	if (initialized) return;
+	center = AGame::vectorToGridIndex(GetActorLocation());
 	SetActorLocation(AGame::gridIndexToVector(center));
 	for (uint8 i = 0; i < tiles.Num(); i++) {
 		tiles[i].pos += center;
 		AGame::setTile(tiles[i]);
 	}
+	initialized = true;
 }
 
