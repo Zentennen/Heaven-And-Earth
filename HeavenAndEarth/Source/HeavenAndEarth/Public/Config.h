@@ -1,6 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
-#include "GameLib.generated.h"
+#include "Config.generated.h"
 
 #define INVALID_GI FGridIndex(-1, -1)
 #define INVALID_TILE Tile()
@@ -14,21 +14,6 @@
 #define debugGI(a) if(GEngine) { FString fstr = TEXT("(") + FString::FromInt(a.x) + TEXT(", ") + FString::FromInt(a.y) + TEXT(")"); GEngine->AddOnScreenDebugMessage(-1, DEBUG_TEXT_TIME, FColor::Purple, *fstr); }
 
 class AUnit;
-
-UENUM(BlueprintType)
-enum class Order : uint8 {
-	Rest, Move, Rotate, CounterRotate
-};
-
-UENUM(BlueprintType)
-enum class BodyPart : uint8 {
-	Head, Torso, Arms, Legs
-};
-
-UENUM(BlueprintType)
-enum class Perk : uint8 {
-	Ruthless, Swift, Resolute, Precise, Steadfast, Stalwart, Tough
-};
 
 UENUM(BlueprintType)
 enum class HexDirection : uint8 {
@@ -72,10 +57,10 @@ struct FGridIndex {
 		y *= mult;
 		return *this;
 	}
-	//operator FString& () {
-	//	FString fstr = TEXT("(") + FString::FromInt(x) + TEXT(", ") + FString::FromInt(y) + TEXT(")");
-	//	return fstr;
-	//}
+	operator FString& () {
+		FString fstr = TEXT("(") + FString::FromInt(x) + TEXT(", ") + FString::FromInt(y) + TEXT(")");
+		return fstr;
+	}
 	operator FString() const {
 		return TEXT("(") + FString::FromInt(x) + TEXT(", ") + FString::FromInt(y) + TEXT(")");
 	}
@@ -123,7 +108,7 @@ struct FTile {
 	}
 };
 
-namespace GameLib {
+namespace Config {
 	const uint8 strongHitPowerNeeded = 8;
 	const uint8 strongHitTalentPowerNeeded = 5;
 	const uint8 weakHitPowerNeeded = 5;

@@ -1,29 +1,35 @@
 #include "Game.h"
 #include "UnrealNetwork.h"
-#include "AStar.h"
 #include "Engine.h"
 #include "Scenery.h"
-#include "GameLib.h"
+#include "UnitSave.h"
+#include "GI.h"
+#include "CampaignSave.h"
+#include "Engine.h"
 #include <cmath>
-#include "..\Public\Game.h"
 
 AGame* AGame::game;
 
 AGame::AGame()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	tiles.Init(FTileColumn(GameLib::mapY), GameLib::mapX);
+	tiles.Init(FTileColumn(Config::mapY), Config::mapX);
 }
 
 void AGame::BeginPlay()
 {
-	if (HasAuthority() || !IsValid(game)) game = this; //needed so multiple game instances running in editor don't reset game
-	if (HasAuthority()) { 
-		for (TActorIterator<AUnit> it(GetWorld()); it; ++it) addUnit(*it);
-		for (TActorIterator<APC> it(GetWorld()); it; ++it) addPC(*it);
-		for (TActorIterator<AScenery> it(GetWorld()); it; ++it) it->init();
-	}
 	Super::BeginPlay();
+	if (HasAuthority() || !IsValid(game)) game = this; //needed so multiple game instances running in editor don't reset game
+	if (!HasAuthority()) return;
+	for (TActorIterator<APC> it(GetWorld()); it; ++it) addPC(*it);
+	auto inst = Cast<UGI>(GetGameInstance());
+	campaignName = inst->campaignName;
+	save = Cast<UCampaignSave>(UGameplayStatics::LoadGameFromSlot(getSaveName(), 0));
+	if (!save) {
+		save = Cast<UCampaignSave>(UGameplayStatics::CreateSaveGameObject(UCampaignSave::StaticClass()));
+		finishedLoading = true;
+		onRepFinishedLoading();
+	}
 }
 
 void AGame::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -34,18 +40,35 @@ void AGame::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void AGame::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	if (!executing || !HasAuthority()) return;
-	timer += DeltaTime;
-	if (timer < actionTime) return;
-	timer = 0.0f;
-	counter++;
-	for (auto i : game->units) i->executeOrder();
-	if (counter >= actionsPerTurn) {
-		counter = 0;
-		executing = false;
-		for (auto i : game->units) i->endTurn();
-		for (auto i : game->pcs) i->endTurn();
-		onRepExecuting();
+	if (!HasAuthority()) return;
+	if (executing) {
+		timer += DeltaTime;
+		if (timer < actionTime) return;
+		timer = 0.0f;
+		counter++;
+		for (auto i : game->units) i->executeOrder();
+		if (counter >= actionsPerTurn) {
+			counter = 0;
+			executing = false;
+			for (auto i : game->units) i->endTurn();
+			for (auto i : game->pcs) i->endTurn();
+			onRepExecuting();
+		}
+	}
+	else if (!finishedLoading) {
+		auto world = GetWorld();
+		if (accountCounter < save->numAccounts) {
+			auto acc = world->SpawnActor<AAccount>();
+			acc->load(accountCounter);
+		}
+		else if (unitCounter < save->numUnits) {
+			auto unit = world->SpawnActor<AUnit>();
+			unit->load(unitCounter);
+		}
+		else {
+			finishedLoading = true;
+			onRepFinishedLoading();
+		}
 	}
 }
 
@@ -53,41 +76,56 @@ void AGame::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimePro
 {
 	DOREPLIFETIME(AGame, tiles);
 	DOREPLIFETIME(AGame, executing);
+	DOREPLIFETIME(AGame, finishedLoading);
 }
 
-bool AGame::addUnit(AUnit* unit)
+FString AGame::getSaveName() const
 {
-	if (!IsValid(game)) return false;
+	return FString(TEXT("Campaign ")) + campaignName;
+}
+
+int32 AGame::addUnit(AUnit* unit)
+{
+	if (!IsValid(game)) return -1;
 	if (!unit) {
-		debugStr("ERROR: AGame::addUnit(): unit is null");
-		return false;
+		debugStr("AGame::addUnit(): unit is null");
+		return -1;
 	}
-	if (game->units.Contains(unit)) return false;
-	game->units.Emplace(unit);
-	if (!game->tiles[unit->position.x].units[unit->position.y]) game->tiles[unit->position.x].units[unit->position.y] = unit;
-	else {
-		TArray<FGridIndex> open;
-		TArray<FGridIndex> closed;
-		open.Empty();
-		closed.Empty();
-		open.Append(getRingOfGridIndices(unit->position));
-		closed.Emplace(unit->position);
-		while (true) {
-			for (auto i : open) {
-				if (!game->tiles[i.x].units[i.y]) {
-					unit->position = i;
-					game->tiles[i.x].units[i.y] = unit;
-					return true;
-				}
-				else closed.Emplace(i);
-			}
-			for (auto i : open) {
-				TArray<FGridIndex> arr = getRingOfGridIndices(i);
-				for (auto j : arr) if (!closed.Contains(j)) open.AddUnique(j);
-			}
-		}
+	if (game->units.Contains(unit)) return -1;
+	return game->units.Emplace(unit);
+}
+
+int32 AGame::addAccount(AAccount* account)
+{
+	if (!IsValid(game)) return -1;
+	if (!account) {
+		debugStr("AGame::addAccount(): account was null");
+		return -1;
 	}
-	return true;
+	if (game->accounts.Contains(account)) return -1;
+	return game->accounts.Emplace(account);
+}
+
+void AGame::removeUnit(AUnit* unit)
+{
+	if (!unit) {
+		debugStr("AGame::removeUnit(): unit was null");
+		return;
+	}
+	game->units.Remove(unit);
+	UGameplayStatics::DeleteGameInSlot(unit->getSaveName(), 0);
+	unit->Destroy();
+}
+
+void AGame::removeAccount(AAccount* account)
+{
+	if (!account) {
+		debugStr("AGame::removeAccount(): account was null");
+		return;
+	}
+	game->accounts.Remove(account);
+	UGameplayStatics::DeleteGameInSlot(account->getSaveName(), 0);
+	account->Destroy();
 }
 
 bool AGame::addPC(APC* pc)
@@ -115,17 +153,24 @@ bool AGame::canCompleteOrder(AUnit* unit)
 		return unit->orderProgress * unit->getStats().movementSpeed >= game->tiles[gi.x].costs[gi.y];
 	}
 	case Order::Rotate: {
-		return unit->orderProgress * unit->getStats().rotationSpeed >= GameLib::rotationNeeded;
+		return unit->orderProgress * unit->getStats().rotationSpeed >= Config::rotationNeeded;
 	}
 	case Order::CounterRotate: {
-		return unit->orderProgress * unit->getStats().rotationSpeed >= GameLib::rotationNeeded;
+		return unit->orderProgress * unit->getStats().rotationSpeed >= Config::rotationNeeded;
 	}
 	default: return true;
 	}
 }
 
+FString AGame::getCampaignName()
+{
+	if (!game) return FString();
+	return game->campaignName;
+}
+
 void AGame::executeTurn()
 {
+	if (!game->HasAuthority()) return;
 	if (game->executing) return;
 	game->executing = true;
 	for (auto i : game->units) i->beginTurn();
@@ -135,8 +180,14 @@ void AGame::executeTurn()
 
 bool AGame::isValidPos(const FGridIndex& pos)
 {
-	if (pos.x < 0 || pos.x >= GameLib::mapX || pos.y < 0 || pos.y >= GameLib::mapY) return false;
+	if (pos.x < 0 || pos.x >= Config::mapX || pos.y < 0 || pos.y >= Config::mapY) return false;
 	else return true;
+}
+
+bool AGame::isOpenPos(const FGridIndex& pos)
+{
+	if (!isValidPos(pos)) return false;
+	return game->tiles[pos.x].units[pos.y] == nullptr;
 }
 
 FTile AGame::getTile(const FGridIndex& tilePos)
@@ -198,20 +249,6 @@ bool AGame::setTile(const FTile& t)
 	return true;
 }
 
-TArray<FGridIndex> AGame::getPathAsGridIndices(FGridIndex start, FGridIndex goal)
-{
-	TArray<FGridIndex> ret;
-	ret.Empty();
-	auto path = AStar::getPath(start, goal, 999);
-	if (!path) return ret;
-	path = path->parent;
-	while (path) {
-		ret.Emplace(path->tile.pos);
-		path = path->parent;
-	}
-	return ret;
-}
-
 int32 AGame::manhattanDistance(const FGridIndex& start, const FGridIndex& goal)
 {
 	int32 startX = start.x - (start.y + (start.y & 1)) / 2;
@@ -232,13 +269,19 @@ int32 AGame::roll(uint8 num, uint8 max)
 	return result;
 }
 
+APC* AGame::getLocalPC()
+{
+	if (!IsValid(game)) return nullptr;
+	return Cast<APC>(game->GetWorld()->GetFirstPlayerController());
+}
+
 FGridIndex AGame::vectorToGridIndex(const FVector& vec)
 {
-	float x = vec.Y / GameLib::hexSize;
-	float y = vec.X / GameLib::hexY;
+	float x = vec.Y / Config::hexSize;
+	float y = vec.X / Config::hexY;
 	FGridIndex gi(FMath::FloorToInt(x), FMath::FloorToInt(y));
 	if (gi.y % 2 == 0) {
-		if (y - gi.y > GameLib::third + GameLib::twoThirds * FMath::Abs(x - gi.x - 0.5f)) {
+		if (y - gi.y > Config::third + Config::twoThirds * FMath::Abs(x - gi.x - 0.5f)) {
 			gi.y += 1;
 			gi.x += 1;
 			return gi;
@@ -249,7 +292,7 @@ FGridIndex AGame::vectorToGridIndex(const FVector& vec)
 		}
 	}
 	else {
-		if (y - gi.y > GameLib::twoThirds - GameLib::twoThirds * FMath::Abs(x - gi.x - 0.5f)) {
+		if (y - gi.y > Config::twoThirds - Config::twoThirds * FMath::Abs(x - gi.x - 0.5f)) {
 			gi.y += 1;
 			gi.x = FMath::FloorToInt(x + 0.5f);
 			return gi;
@@ -269,8 +312,8 @@ FGridIndex AGame::vector2DToGridIndex(const FVector2D& vec)
 
 FVector AGame::gridIndexToVector(const FGridIndex& gi, float z)
 {
-	if (gi.y % 2 == 0) return FVector(gi.y * GameLib::hexY, gi.x * GameLib::hexSize, z);
-	else return FVector(gi.y * GameLib::hexY, gi.x * GameLib::hexSize - GameLib::hexHalfSize, z);
+	if (gi.y % 2 == 0) return FVector(gi.y * Config::hexY, gi.x * Config::hexSize, z);
+	else return FVector(gi.y * Config::hexY, gi.x * Config::hexSize - Config::hexHalfSize, z);
 }
 
 FVector2D AGame::gridIndexToVector2D(const FGridIndex& gi)
@@ -325,13 +368,66 @@ bool AGame::isAdjacent(const FGridIndex& base, const FGridIndex& other)
 
 bool AGame::moveUnit(AUnit* unit)
 {
-	if (!unit) return false;
+	if (!unit) {
+		debugStr("AGame::moveUnit(): unit was null");
+		return false;
+	}
 	auto newPos = movementToGridIndex(unit->direction, unit->position);
 	if (!isValidPos(newPos)) return false;
 	if (game->tiles[newPos.x].units[newPos.y]) return false;
 	game->tiles[newPos.x].units[newPos.y] = unit;
-	game->tiles[unit->position.x].units[unit->position.y] = nullptr;
+	if (game->tiles[unit->position.x].units[unit->position.y] == unit) game->tiles[unit->position.x].units[unit->position.y] = nullptr;
+	else debugStr("AGame::moveUnit(): unit was not at its position");
 	unit->position = newPos;
+	return true;
+}
+
+bool AGame::teleportUnit(AUnit* unit, const FGridIndex& pos)
+{
+	if (!unit) {
+		debugStr("AGame::teleportUnit(): unit was null");
+		return false;
+	}
+	if (game->tiles[pos.x].units[pos.y] != nullptr) return false;
+	game->tiles[pos.x].units[pos.y] = unit;
+	if (game->tiles[unit->position.x].units[unit->position.y] == unit) game->tiles[unit->position.x].units[unit->position.y] = nullptr;
+	else debugStr("AGame::teleportUnit(): unit was not at its position");
+	unit->position = pos;
+	return true;
+}
+
+bool AGame::addUnitToMap(AUnit* unit, const FGridIndex& pos)
+{
+	if (!unit) {
+		debugStr("AGame::addUnitToMap(): unit was null");
+		return false;
+	}
+	if (game->tiles[pos.x].units[pos.y] != nullptr) return false;
+	game->tiles[pos.x].units[pos.y] = unit;
+	unit->position = pos;
+	if (!game->tiles[unit->position.x].units[unit->position.y]) game->tiles[unit->position.x].units[unit->position.y] = unit;
+	else {
+		TArray<FGridIndex> open;
+		TArray<FGridIndex> closed;
+		open.Empty();
+		closed.Empty();
+		open.Append(getRingOfGridIndices(unit->position));
+		closed.Emplace(unit->position);
+		while (true) {
+			for (auto i : open) {
+				if (!game->tiles[i.x].units[i.y]) {
+					unit->position = i;
+					game->tiles[i.x].units[i.y] = unit;
+					return true;
+				}
+				else closed.Emplace(i);
+			}
+			for (auto i : open) {
+				TArray<FGridIndex> arr = getRingOfGridIndices(i);
+				for (auto j : arr) if (!closed.Contains(j)) open.AddUnique(j);
+			}
+		}
+	}
 	return true;
 }
 
@@ -355,15 +451,34 @@ bool AGame::createAccount(APC* pc, const FString& username, const FString& passw
 {
 	if (!pc) return false;
 	for (auto i : game->accounts) {
-		auto result = i->canLogin(username, password);
-		if (result != LoginResult::NotRegistered) return false;
+		if (i->canLogin(username, password) != LoginResult::NotRegistered) return false;
 	}
 	auto acc = pc->GetWorld()->SpawnActor<AAccount>(FVector::ZeroVector, FRotator::ZeroRotator);
-	game->accounts.Emplace(acc);
-	acc->username = username;
-	acc->password = password;
+	acc->init(username, password);
 	login(pc, username, password);
 	return true;
+}
+
+AAccount* AGame::getAccount(const FString& username)
+{
+	if (!IsValid(game)) {
+		debugStr("AGame::getAccount(): game is invalid");
+		return nullptr;
+	}
+	for (auto i : game->accounts) if (i->getUsername() == username) return i;
+	return nullptr;
+}
+TArray<FString> AGame::getUsernames()
+{
+	TArray<FString> ret;
+	ret.Empty();
+	for (auto i : game->accounts) ret.Emplace(i->getUsername());
+	return ret;
+}
+
+TArray<AAccount*> AGame::getAccounts()
+{
+	return game->accounts;
 }
 
 LoginResult AGame::login(APC* pc, const FString& username, const FString& password)
@@ -374,7 +489,7 @@ LoginResult AGame::login(APC* pc, const FString& username, const FString& passwo
 		case LoginResult::Success:
 			pc->account = i;
 			return LoginResult::Success;
-		case LoginResult::Fail: 
+		case LoginResult::Fail:
 			return LoginResult::Fail;
 		default:
 			break;
@@ -412,7 +527,7 @@ TArray<FGridIndex> AGame::getRingOfGridIndices(const FGridIndex& gi, int32 radiu
 	if (radius == 0) ret.Emplace(gi);
 	else for (uint8 j = 0; j < 6; j++) {
 		auto a = movementToGridIndex((HexDirection)j, gi, radius);
-		if(isValidPos(a)) ret.Emplace(a);
+		if (isValidPos(a)) ret.Emplace(a);
 	}
 	return ret;
 }
@@ -458,4 +573,22 @@ int32 AGame::getActionsPerTurn()
 bool AGame::isExecuting()
 {
 	return game->executing;
+}
+
+bool AGame::hasGameStarted()
+{
+	return game->finishedLoading && IsValid(game);
+}
+
+void AGame::saveGame()
+{
+	game->save->numAccounts = game->accounts.Num();
+	game->save->numUnits = game->units.Num();
+	UGameplayStatics::SaveGameToSlot(game->save, game->getSaveName(), 0);
+	for (auto i : game->accounts) {
+		i->saveAccount();
+	}
+	for (auto i : game->units) {
+		i->saveUnit();
+	}
 }

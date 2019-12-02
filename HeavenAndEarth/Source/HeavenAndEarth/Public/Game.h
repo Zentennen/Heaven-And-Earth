@@ -1,10 +1,11 @@
 #pragma once
 #include "Unit.h"
+#include "Account.h"
 #include "PC.h"
-#include "Armor.h"
-#include "Weapon.h"
 #include "GameFramework/Actor.h"
 #include "Game.generated.h"
+
+class UCampaignSave;
 
 USTRUCT(BlueprintType)
 struct FTileColumn {
@@ -33,29 +34,39 @@ class HEAVENANDEARTH_API AGame : public AActor
 	GENERATED_BODY()
 protected:
 	static AGame* game;
+	UCampaignSave* save;
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) FString campaignName;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) float timer;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) uint8 counter;
-	UPROPERTY(BlueprintReadOnly, EditAnywhere) float actionTime;
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = onRepExecuting) bool executing;
-	UPROPERTY(BlueprintReadOnly, EditAnywhere) int32 actionsPerTurn;
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated) TArray<FTileColumn> tiles;
-	virtual void BeginPlay() override;
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-	UFUNCTION(BlueprintImplementableEvent) void onRepExecuting();
-
-public:	
-	UPROPERTY(BlueprintReadWrite, EditAnywhere) TArray<FWeapon> weapons;
-	UPROPERTY(BlueprintReadWrite, EditAnywhere) TArray <FArmor> armor;
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) uint8 unitCounter;
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) uint8 accountCounter;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) TArray<AUnit*> units;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) TArray<AAccount*> accounts;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) TArray<APC*> pcs;
+	UPROPERTY(BlueprintReadOnly, EditAnywhere) float actionTime;
+	UPROPERTY(BlueprintReadOnly, EditAnywhere) int32 actionsPerTurn;
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated) TArray<FTileColumn> tiles;
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = onRepExecuting) bool executing;
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = onRepFinishedLoading) bool finishedLoading;
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	UFUNCTION(BlueprintImplementableEvent) void onRepExecuting();
+	UFUNCTION(BlueprintImplementableEvent) void onRepFinishedLoading();
+
+public:
 	AGame();
 	virtual void Tick(float DeltaTime) override;
 	void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	static bool addUnit(AUnit* unit);
+	FString getSaveName() const;
 	static bool addPC(APC* pc);
+	static int32 addUnit(AUnit* unit);
+	static int32 addAccount(AAccount* account);
+	static void removeUnit(AUnit* unit);
+	static void removeAccount(AAccount* account);
 	static bool canCompleteOrder(AUnit* unit);
+	static FString getCampaignName();
 	UFUNCTION(BlueprintPure) static bool isValidPos(const FGridIndex& pos);
+	UFUNCTION(BlueprintPure) static bool isOpenPos(const FGridIndex& pos);
 	UFUNCTION(BlueprintPure) static int32 manhattanDistance(const FGridIndex& start, const FGridIndex& goal);
 	UFUNCTION(BlueprintPure) static FTile getTile(const FGridIndex& tilePos);
 	UFUNCTION(BlueprintPure) static FGridIndex movementToGridIndex(HexDirection dir, const FGridIndex& pos, int32 distance = 1);
@@ -69,10 +80,13 @@ public:
 	UFUNCTION(BlueprintPure) static AGame* getGame();
 	UFUNCTION(BlueprintPure) static int32 getActionsPerTurn();
 	UFUNCTION(BlueprintPure) static bool isExecuting();
+	UFUNCTION(BlueprintPure) static bool hasGameStarted();
+	UFUNCTION(BlueprintPure) static TArray<AAccount*> getAccounts();
+	UFUNCTION(BlueprintCallable) static void saveGame();
 	UFUNCTION(BlueprintCallable) static void executeTurn();
 	UFUNCTION(BlueprintCallable) static bool setTile(const FTile& t);
-	UFUNCTION(BlueprintCallable) static TArray<FGridIndex> getPathAsGridIndices(FGridIndex start, FGridIndex goal);
 	UFUNCTION(BlueprintCallable) static int32 roll(uint8 num, uint8 max);
+	UFUNCTION(BlueprintCallable) static APC* getLocalPC();
 	UFUNCTION(BlueprintCallable) static FGridIndex vectorToGridIndex(const FVector& vec);
 	UFUNCTION(BlueprintCallable) static FGridIndex vector2DToGridIndex(const FVector2D& vec);
 	UFUNCTION(BlueprintCallable) static FVector gridIndexToVector(const FGridIndex& gi, float z = 0.0f);
@@ -81,8 +95,12 @@ public:
 	UFUNCTION(BlueprintCallable) static bool gridIndicesToHexDirection(const FGridIndex& base, const FGridIndex& other, HexDirection& dir);
 	UFUNCTION(BlueprintCallable) static bool isAdjacent(const FGridIndex& base, const FGridIndex& other);
 	UFUNCTION(BlueprintCallable) static bool moveUnit(AUnit* unit);
+	UFUNCTION(BlueprintCallable) static bool teleportUnit(AUnit* unit, const FGridIndex& pos);
+	UFUNCTION(BlueprintCallable) static bool addUnitToMap(AUnit* unit, const FGridIndex& pos);
 	UFUNCTION(BlueprintCallable) static bool canLogin(APC* pc, const FString& username, const FString& password);
 	UFUNCTION(BlueprintCallable) static bool createAccount(APC* pc, const FString& username, const FString& password);
+	UFUNCTION(BlueprintCallable) static AAccount* getAccount(const FString& username);
+	UFUNCTION(BlueprintCallable) static TArray<FString> getUsernames();
 	UFUNCTION(BlueprintCallable) static LoginResult login(APC* pc, const FString& username, const FString& password);
 	UFUNCTION(BlueprintCallable) static TArray<Order> getRotationOrdersTo(const HexDirection& start, const HexDirection& goal);
 };

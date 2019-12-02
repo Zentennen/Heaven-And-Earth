@@ -4,14 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
-#include "Save.generated.h"
+#include "CampaignSave.generated.h"
 
-/**
- * 
- */
 UCLASS()
-class HEAVENANDEARTH_API USave : public USaveGame
+class HEAVENANDEARTH_API UCampaignSave : public USaveGame
 {
 	GENERATED_BODY()
-	
+public: 
+	uint32 numAccounts;
+	uint32 numUnits;
 };

@@ -1,9 +1,29 @@
 #include "Unit.h"
 #include "Game.h"
 #include "PC.h"
+#include "UnitSave.h"
 #include "Engine.h"
 #include "UnrealNetwork.h"
 #include "..\Public\Unit.h"
+
+void FArmorLayer::damage(FArmorLayer layer, uint32 dmg)
+{
+	layer.condition -= dmg;
+	if (layer.condition < 0) layer.condition = 0;
+	layer.protection = layer.baseProtection * layer.condition / layer.maxCondition;
+}
+
+void FArmorLayer::repair(FArmorLayer layer, uint32 rep)
+{
+	layer.condition += rep;
+	if (layer.condition > layer.maxCondition) layer.condition = layer.maxCondition;
+	layer.protection = layer.baseProtection * layer.condition / layer.maxCondition;
+}
+
+void FArmorLayer::repairPercentage(FArmorLayer layer, uint8 percent)
+{
+	repair(layer, layer.maxCondition * percent / 100);
+}
 
 AUnit::AUnit()
 {
@@ -25,7 +45,6 @@ void AUnit::BeginPlay()
 {
 	Super::BeginPlay();
 	if (!HasAuthority()) return;
-	AGame::addUnit(this);
 	position = AGame::vectorToGridIndex(GetActorLocation());
 	SetActorLocation(AGame::gridIndexToVector(position));
 }
@@ -80,15 +99,9 @@ void AUnit::damageHealthy(const float& dmg, const uint8& lethality)
 	}
 }
 
-void AUnit::addOrders(TArray<Order> newOrders)
+void AUnit::addOrders(const TArray<Order>& newOrders)
 {
 	orders.Append(newOrders);
-	onOrdersChanged();
-}
-
-void AUnit::replaceOrders(TArray<Order> newOrders)
-{
-	orders = newOrders;
 	onOrdersChanged();
 }
 
@@ -104,15 +117,11 @@ void AUnit::Tick(float DeltaTime)
 void AUnit::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	DOREPLIFETIME(AUnit, name);
+	DOREPLIFETIME(AUnit, account);
 	DOREPLIFETIME(AUnit, team);
 	DOREPLIFETIME(AUnit, position);
 	DOREPLIFETIME(AUnit, direction);
 	DOREPLIFETIME(AUnit, baseStats);
-	DOREPLIFETIME(AUnit, headArmor);
-	DOREPLIFETIME(AUnit, torsoArmor);
-	DOREPLIFETIME(AUnit, armArmor);
-	DOREPLIFETIME(AUnit, legArmor);
-	DOREPLIFETIME(AUnit, perks);
 	DOREPLIFETIME(AUnit, orders);
 	DOREPLIFETIME(AUnit, path);
 }
@@ -134,19 +143,19 @@ void AUnit::attack(const AUnit* attacker, const BodyPart& bodyPart, float dmg, f
 	}
 	FArmor armor;
 	switch (bodyPart) {
-	case BodyPart::Head: 
-		armor = headArmor;
+	case BodyPart::Head:
+		armor = baseStats.headArmor;
 		lethality += 1;
 		break;
-	case BodyPart::Torso: 
-		armor = torsoArmor;
-		power *= GameLib::torsoPowerMult;
+	case BodyPart::Torso:
+		armor = baseStats.torsoArmor;
+		power *= Config::torsoPowerMult;
 		break;
 	case BodyPart::Arms:
-		armor = armArmor;
+		armor = baseStats.armArmor;
 		break;
 	case BodyPart::Legs:
-		armor = legArmor;
+		armor = baseStats.legArmor;
 		break;
 	default:
 		return;
@@ -158,13 +167,13 @@ void AUnit::attack(const AUnit* attacker, const BodyPart& bodyPart, float dmg, f
 		for (uint8 j = 0; j < armor.pieces[i].layers.Num(); j++) {
 			FArmorLayer layer = armor.pieces[i].layers[j];
 			p -= layer.protection;
-			FArmorLayer::damage(layer, d * (p + GameLib::conditionDamagePowerBonus));
+			FArmorLayer::damage(layer, d * (p + Config::conditionDamagePowerBonus));
 		}
-		int32 critThreshold = attacker->perks.Contains(Perk::Ruthless) ? GameLib::strongHitTalentPowerNeeded : GameLib::strongHitPowerNeeded;
+		int32 critThreshold = attacker->getStats().perks.Contains(Perk::Ruthless) ? Config::strongHitTalentPowerNeeded : Config::strongHitPowerNeeded;
 		if (p >= critThreshold) {
 			l += 1;
 		}
-		if(p >= 0.0f) damageSoldiers(d, l);
+		if (p >= 0.0f) damageSoldiers(d, l);
 	}
 }
 
@@ -198,14 +207,14 @@ void AUnit::executeOrder()
 	case Order::Rotate: {
 		int8 a = (uint8)direction;
 		a++;
-		a = GameLib::posMod<int8>(a, 6);
+		a = Config::posMod<int8>(a, 6);
 		direction = (HexDirection)a;
 		break;
 	}
 	case Order::CounterRotate: {
 		int8 a = (uint8)direction;
 		a--;
-		a = GameLib::posMod<int8>(a, 6);
+		a = Config::posMod<int8>(a, 6);
 		direction = (HexDirection)a;
 		break;
 	}
@@ -226,53 +235,42 @@ void AUnit::queueMove(const FGridIndex& destination)
 	}
 	if (path.Num() == 0) lastDirection = direction;
 	auto o = AGame::getRotationOrdersTo(lastDirection, dir);
-	orders.Append(o);
-	orders.Emplace(Order::Move);
-	path.Emplace(destination);
+	o.Emplace(Order::Move);
 	lastDirection = dir;
+	addOrders(o);
+	path.Emplace(destination);
 	onPathChanged();
-	onOrdersChanged();
 }
 
-//void AUnit::moveAlongPath(const TArray<FGridIndex>& p, const bool& replaceCurrentOrders)
-//{
-//	if (p.Num() == 0) return;
-//	FGridIndex pos = position;
-//	HexDirection dir = direction;
-//	HexDirection temp;
-//	TArray<Order> newOrders;
-//	for (uint8 i = 0; i < p.Num(); i++) {
-//		if (AGame::gridIndicesToHexDirection(pos, p[i], temp)) {
-//			auto o = getRotationOrdersTo(dir, temp);
-//			newOrders.Append(o);
-//			newOrders.Emplace(Order::Move);
-//			pos = p[i];
-//			dir = temp;
-//		}
-//		else {
-//			FString fstr(" received invalid path to move along.");
-//			debugFstr(name + fstr);
-//			return;
-//		}
-//	}
-//	if (replaceCurrentOrders) replaceOrders(newOrders);
-//	else addOrders(newOrders);
-//}
+void AUnit::saveUnit()
+{
+	if (!save) {
+		debugStr("AUnit::saveUnit() no save");
+		return;
+	}
+	save->name = name;
+	save->baseStats = baseStats;
+	save->position = position;
+	save->direction = direction;
+	save->orders = orders;
+	save->path = path;
+	UGameplayStatics::AsyncSaveGameToSlot(save, getSaveName(), 0);
+}
 
 FUnitStats AUnit::getStats() const
 {
 	FUnitStats ret = baseStats;
-	float val = perks.Contains(Perk::Swift) ? 1.2f : 1.0f;
+	float val = baseStats.perks.Contains(Perk::Swift) ? 1.2f : 1.0f;
 	ret.formationStrengthRecovery *= val;
-	val = perks.Contains(Perk::Resolute) ? 1.3f : 1.0f;
+	val = baseStats.perks.Contains(Perk::Resolute) ? 1.3f : 1.0f;
 	ret.moraleRecovery *= val;
-	val = perks.Contains(Perk::Tough) ? 1.2f : 1.0f;
+	val = baseStats.perks.Contains(Perk::Tough) ? 1.2f : 1.0f;
 	ret.staminaRecovery *= val;
-	val = perks.Contains(Perk::Tough) ? 1.4f : 1.0f;
+	val = baseStats.perks.Contains(Perk::Tough) ? 1.4f : 1.0f;
 	ret.staminaLimitRecovery *= val;
-	val = perks.Contains(Perk::Swift) ? 1.1f : 1.0f;
+	val = baseStats.perks.Contains(Perk::Swift) ? 1.1f : 1.0f;
 	ret.movementSpeed *= val;
-	val = perks.Contains(Perk::Swift) ? 1.5f : 1.0f;
+	val = baseStats.perks.Contains(Perk::Swift) ? 1.5f : 1.0f;
 	ret.rotationSpeed *= val;
 	return ret;
 }
@@ -298,8 +296,68 @@ FGridIndex AUnit::getFinalPosition() const
 	else return path.Last();
 }
 
+bool AUnit::isMyAccount(AAccount* acc)
+{
+	if (!acc) return false;
+	if (!account) return false;
+	else return acc == account;
+}
+
+void AUnit::resetOrders()
+{
+	orders.Empty();
+	onOrdersChanged();
+	path.Empty();
+	onPathChanged();
+}
+
 TArray<FGridIndex> AUnit::getPossibleMoves() const
 {
 	return AGame::getRingOfGridIndices(getFinalPosition());
+}
+
+void AUnit::init(const FString& pName, const FString& accountUsername, const FUnitStats& pStats, const FGridIndex& pPosition, const HexDirection& pDirection)
+{
+	init(pName, AGame::getAccount(accountUsername), pStats, pPosition, pDirection);
+}
+
+void AUnit::init(const FString& pName, AAccount* pAccount, const FUnitStats& pStats, const FGridIndex& pPosition, const HexDirection& pDirection)
+{
+	if (id != -1) {
+		debugStr("AUnit::init(): unit was already initialized");
+		return;
+	}
+	id = AGame::addUnit(this);
+	if (id == -1) {
+		debugStr("AUnit::init(): could not add unit");
+		AGame::removeUnit(this);
+		return;
+	}
+	if (UGameplayStatics::LoadGameFromSlot(getSaveName(), 0)) debugStr("AUnit::init(): save game already exists");
+	name = pName;
+	save = Cast<UUnitSave>(UGameplayStatics::CreateSaveGameObject(UUnitSave::StaticClass()));
+	account = pAccount;
+	baseStats = pStats;
+	position = pPosition;
+	direction = pDirection;
+}
+
+void AUnit::load(const int32& pId)
+{
+	id = pId;
+	save = Cast<UUnitSave>(UGameplayStatics::LoadGameFromSlot(getSaveName(), 0));
+	id = AGame::addUnit(this); //TEMP: if a unit is added during loading (should not be possible) need to make sure the correct unit is still loaded
+	name = save->name;
+	baseStats = save->baseStats;
+	position = save->position;
+	direction = save->direction;
+	orders = save->orders;
+	path = save->path;
+	account = AGame::getAccount(save->accountUsername);
+}
+
+FString AUnit::getSaveName() const
+{
+	return FString(TEXT("Unit ")) + FString::FromInt(id) + FString(TEXT(" ")) + AGame::getCampaignName();
 }
 

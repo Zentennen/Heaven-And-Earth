@@ -1,27 +1,28 @@
 #pragma once
-#include "GameLib.h"
+#include "Config.h"
 #include "GameFramework/Actor.h"
 #include "HexMarker.generated.h"
 
 UENUM(BlueprintType)
 enum class MarkerType : uint8 {
-	Move, Path, Cursor
+	Move, Path, Cursor, Selected
 };
 
 UCLASS()
 class HEAVENANDEARTH_API AHexMarker : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	AHexMarker();
 
 protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) MarkerType markerType;
 	virtual void BeginPlay() override;
 
-public:	
+public:
 	virtual void Tick(float DeltaTime) override;
+	UFUNCTION(BlueprintCallable) void setProperties(const FGridIndex& gi, MarkerType type);
 	UFUNCTION(BlueprintCallable) void setPos(const FGridIndex& gi);
 	UFUNCTION(BlueprintImplementableEvent) void setType(const MarkerType& type);
 	UFUNCTION(BlueprintImplementableEvent) void hide();

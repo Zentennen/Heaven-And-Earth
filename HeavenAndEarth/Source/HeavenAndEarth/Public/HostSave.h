@@ -3,16 +3,16 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Engine/GameInstance.h"
-#include "GI.generated.h"
+#include "GameFramework/SaveGame.h"
+#include "HostSave.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class HEAVENANDEARTH_API UGI : public UGameInstance
+class HEAVENANDEARTH_API UHostSave : public USaveGame
 {
 	GENERATED_BODY()
 public:
-	FString campaignName;
+	FString lastCampaignName;
 };

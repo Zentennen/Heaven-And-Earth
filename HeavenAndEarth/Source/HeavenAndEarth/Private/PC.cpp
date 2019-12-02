@@ -1,8 +1,8 @@
 #include "PC.h"
-#include "Unit.h"
 #include "Game.h"
 #include "LoginSave.h"
 #include "Kismet/GameplayStatics.h"
+#include "UnrealNetwork.h"
 #include "..\Public\PC.h"
 
 void APC::BeginPlay() {
@@ -20,7 +20,10 @@ void APC::BeginPlay() {
 	else if (!IsValid(markerClass)) debugStr("APC::BeginPlay(): Invalid markerClass");
 	Super::BeginPlay();
 	if (HasAuthority()) {
-		if (IsLocalController()) isGM = true;
+		if (IsLocalController()) {
+			isGM = true;
+			hostInit();
+		}
 		AGame::addPC(this);
 	}
 }
@@ -29,23 +32,14 @@ bool APC::canCommandUnit(AUnit* u) const
 {
 	if (!u) return false;
 	else if (AGame::isExecuting()) return false;
-	else if (u->account != account && !isGM) return false;
+	else if (!u->isMyAccount(account) && !isGM) return false;
 	else return true;
-}
-
-void APC::createUnit(const FVector& location)
-{
-	auto world = GetWorld();
-	if (!world) return;
-	FActorSpawnParameters param;
-	auto loc = location;
-	auto rot = AGame::hexDirectionToRotation(HexDirection::Right);
-	world->SpawnActor(AUnit::StaticClass(), &loc, &rot, param);
 }
 
 void APC::selectUnit(AUnit* u)
 {
 	if (!u || u == unit) return;
+	if (!canCommandUnit(u)) return;
 	if (unit) {
 		unit->unselect();
 		onUnselect();
@@ -69,7 +63,7 @@ void APC::unselect()
 
 void APC::setCursor(const FGridIndex& pos)
 {
-	if(IsValid(cursorMarker)) cursorMarker->setPos(pos);
+	if (IsValid(cursorMarker)) cursorMarker->setPos(pos);
 }
 
 bool APC::requestAccount_Validate(const FString& username, const FString& password)
@@ -126,6 +120,16 @@ void APC::initialize()
 	onInit();
 }
 
+bool APC::createUnit(FString name, AAccount* acc, FUnitStats stats, FGridIndex position, HexDirection direction)
+{
+	if (!HasAuthority() || !AGame::isValidPos(position)) return false;
+	AUnit* u = nullptr;
+	spawnUnit(u, AGame::gridIndexToVector(position), AGame::hexDirectionToRotation(direction));
+	if (!u) return false;
+	u->init(name, acc, stats, position, direction);
+	return true;
+}
+
 void APC::requestLogin_Implementation()
 {
 	auto save = Cast<ULoginSave, USaveGame>(UGameplayStatics::LoadGameFromSlot("Login", 0));
@@ -148,6 +152,11 @@ void APC::endTurn()
 	updateMoveMarkers();
 }
 
+void APC::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	DOREPLIFETIME(APC, account);
+}
+
 void APC::updatePathMarkers(const TArray<FGridIndex>& newPath)
 {
 	if (!IsValid(markerClass) || !IsLocalController()) return;
@@ -162,7 +171,6 @@ void APC::updatePathMarkers(const TArray<FGridIndex>& newPath)
 			m->setPos(newPath[i]);
 			pathMarkers.Emplace(m);
 			m->setType(MarkerType::Path);
-			//m->show/hide();
 		}
 	}
 	for (; i < pathMarkers.Num(); i++) {
