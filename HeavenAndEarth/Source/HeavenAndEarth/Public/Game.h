@@ -35,6 +35,7 @@ class HEAVENANDEARTH_API AGame : public AActor
 protected:
 	static AGame* game;
 	UCampaignSave* save;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere) TMap<FString, FUnitStats> defaultStats;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) FString campaignName;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) float timer;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) uint8 counter;
@@ -65,6 +66,8 @@ public:
 	static void removeAccount(AAccount* account);
 	static bool canCompleteOrder(AUnit* unit);
 	static FString getCampaignName();
+	static void rotateClockwise(HexDirection& dir, uint8 steps = 1);
+	static void rotateCounterClockwise(HexDirection& dir, uint8 steps = 1);
 	UFUNCTION(BlueprintPure) static bool isValidPos(const FGridIndex& pos);
 	UFUNCTION(BlueprintPure) static bool isOpenPos(const FGridIndex& pos);
 	UFUNCTION(BlueprintPure) static int32 manhattanDistance(const FGridIndex& start, const FGridIndex& goal);
@@ -82,6 +85,8 @@ public:
 	UFUNCTION(BlueprintPure) static bool isExecuting();
 	UFUNCTION(BlueprintPure) static bool hasGameStarted();
 	UFUNCTION(BlueprintPure) static TArray<AAccount*> getAccounts();
+	UFUNCTION(BlueprintPure) static FUnitStats getUnitStats(FString name);
+	UFUNCTION(BlueprintPure) static bool isAcceptingCommands();
 	UFUNCTION(BlueprintCallable) static void saveGame();
 	UFUNCTION(BlueprintCallable) static void executeTurn();
 	UFUNCTION(BlueprintCallable) static bool setTile(const FTile& t);

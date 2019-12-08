@@ -1,6 +1,5 @@
 #include "Unit.h"
 #include "Game.h"
-#include "PC.h"
 #include "UnitSave.h"
 #include "Engine.h"
 #include "UnrealNetwork.h"
@@ -55,7 +54,7 @@ void AUnit::onPathChanged()
 	if (!world) return;
 	auto pc = Cast<APC, APlayerController>(world->GetFirstPlayerController());
 	if (!pc) return;
-	if (pc->unit == this) {
+	if (pc->selected == this) {
 		pc->updatePathMarkers(path);
 		pc->updateMoveMarkers();
 	}
@@ -101,8 +100,27 @@ void AUnit::damageHealthy(const float& dmg, const uint8& lethality)
 
 void AUnit::addOrders(const TArray<Order>& newOrders)
 {
+	if (!canAddOrders(newOrders)) return;
 	orders.Append(newOrders);
 	onOrdersChanged();
+	bool changedPath = false;
+	for (auto i : newOrders) {
+		switch (i) {
+		case Order::Rotate:
+			AGame::rotateClockwise(lastDirection);
+			break;
+		case Order::CounterRotate:
+			AGame::rotateCounterClockwise(lastDirection);
+			break;
+		case Order::Move:
+			path.Emplace(AGame::movementToGridIndex(getFinalDirection(), getFinalPosition()));
+			changedPath = true;
+			break;
+		default:
+			break;
+		}
+	}
+	if (changedPath) onPathChanged();
 }
 
 void AUnit::Tick(float DeltaTime)
@@ -124,6 +142,23 @@ void AUnit::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimePro
 	DOREPLIFETIME(AUnit, baseStats);
 	DOREPLIFETIME(AUnit, orders);
 	DOREPLIFETIME(AUnit, path);
+	DOREPLIFETIME(AUnit, lastDirection);
+}
+
+TArray<Order> AUnit::getOrdersToMoveTo(const FGridIndex& pos) const
+{
+	TArray<Order> ret;
+	ret.Empty();
+	HexDirection dir;
+	if (!AGame::gridIndicesToHexDirection(getFinalPosition(), pos, dir)) return ret;
+	ret = AGame::getRotationOrdersTo(getFinalDirection(), dir);
+	ret.Emplace(Order::Move);
+	return ret;
+}
+
+bool AUnit::canAddOrders(const TArray<Order>& newOrders) const
+{
+	return orders.Num() + newOrders.Num() <= Config::maxOrders;
 }
 
 void AUnit::beginTurn()
@@ -224,24 +259,6 @@ void AUnit::executeOrder()
 	orders.RemoveAt(0);
 }
 
-void AUnit::queueMove(const FGridIndex& destination)
-{
-	if (!AGame::isValidPos(destination)) {
-		return;
-	}
-	HexDirection dir;
-	if (!AGame::gridIndicesToHexDirection(getFinalPosition(), destination, dir)) {
-		return;
-	}
-	if (path.Num() == 0) lastDirection = direction;
-	auto o = AGame::getRotationOrdersTo(lastDirection, dir);
-	o.Emplace(Order::Move);
-	lastDirection = dir;
-	addOrders(o);
-	path.Emplace(destination);
-	onPathChanged();
-}
-
 void AUnit::saveUnit()
 {
 	if (!save) {
@@ -254,6 +271,8 @@ void AUnit::saveUnit()
 	save->direction = direction;
 	save->orders = orders;
 	save->path = path;
+	save->orderProgress = orderProgress;
+	save->lastDirection = lastDirection;
 	UGameplayStatics::AsyncSaveGameToSlot(save, getSaveName(), 0);
 }
 
@@ -296,11 +315,43 @@ FGridIndex AUnit::getFinalPosition() const
 	else return path.Last();
 }
 
-bool AUnit::isMyAccount(AAccount* acc)
+HexDirection AUnit::getFinalDirection() const
+{
+	if (path.Num() == 0) return direction;
+	else return lastDirection;
+}
+
+bool AUnit::isMyAccount(AAccount* acc) const
 {
 	if (!acc) return false;
-	if (!account) return false;
+	else if (!account) return false;
 	else return acc == account;
+}
+
+bool AUnit::isAcceptingCommandsFrom(const APC* pc) const
+{
+	if (!pc) {
+		debugStr("AUnit::isAcceptingCommandsFrom(): pc is null");
+		return false;
+	}
+	else if (!AGame::isAcceptingCommands()) return false;
+	else if (pc->getIsGM()) return true;
+	else return isMyAccount(pc->account);
+}
+
+bool AUnit::isAcceptingOrdersFrom(const APC* pc) const
+{
+	if (!pc) {
+		debugStr("AUnit::isAcceptingOrdersFrom(): pc is null");
+		return false;
+	}
+	else if (!isAcceptingCommandsFrom(pc)) return false;
+	else return true;
+}
+
+bool AUnit::acceptsOrders(const TArray<Order>& newOrders, const APC* pc) const
+{
+	return isAcceptingOrdersFrom(pc) && canAddOrders(newOrders);
 }
 
 void AUnit::resetOrders()
@@ -313,7 +364,8 @@ void AUnit::resetOrders()
 
 TArray<FGridIndex> AUnit::getPossibleMoves() const
 {
-	return AGame::getRingOfGridIndices(getFinalPosition());
+	auto ring = AGame::getRingOfGridIndices(getFinalPosition());
+	return ring;
 }
 
 void AUnit::init(const FString& pName, const FString& accountUsername, const FUnitStats& pStats, const FGridIndex& pPosition, const HexDirection& pDirection)
@@ -340,6 +392,10 @@ void AUnit::init(const FString& pName, AAccount* pAccount, const FUnitStats& pSt
 	baseStats = pStats;
 	position = pPosition;
 	direction = pDirection;
+	lastDirection = direction;
+	AGame::addUnitToMap(this, position);
+	ETeleportType tele = ETeleportType::TeleportPhysics;
+	modelBase->SetRelativeRotation(AGame::hexDirectionToRotation(direction), false, nullptr, tele);
 }
 
 void AUnit::load(const int32& pId)
@@ -352,8 +408,13 @@ void AUnit::load(const int32& pId)
 	position = save->position;
 	direction = save->direction;
 	orders = save->orders;
+	orderProgress = save->orderProgress;
 	path = save->path;
+	lastDirection = save->lastDirection;
 	account = AGame::getAccount(save->accountUsername);
+	AGame::addUnitToMap(this, position);
+	ETeleportType tele = ETeleportType::TeleportPhysics;
+	modelBase->SetRelativeRotation(AGame::hexDirectionToRotation(direction), false, nullptr, tele);
 }
 
 FString AUnit::getSaveName() const

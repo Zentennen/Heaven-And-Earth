@@ -19,4 +19,6 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) HexDirection direction;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) TArray<Order> orders;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) TArray<FGridIndex> path;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere) uint8 orderProgress;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere) HexDirection lastDirection;
 };

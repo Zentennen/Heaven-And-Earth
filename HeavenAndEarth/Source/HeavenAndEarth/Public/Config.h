@@ -115,6 +115,7 @@ namespace Config {
 	const uint8 mapX = 100;
 	const uint8 mapY = 100;
 	const uint8 rotationNeeded = 100;
+	const uint8 maxOrders = 50;
 	const float conditionDamagePowerBonus = 5.0f;
 	const float torsoPowerMult = 1.1f;
 	const float hexSize = 100.0f;

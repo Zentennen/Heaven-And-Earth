@@ -4,6 +4,7 @@
 
 class AAccount;
 class UUnitSave;
+class APC;
 
 UENUM(BlueprintType)
 enum class Order : uint8 {
@@ -97,7 +98,6 @@ protected:
 	void damageCrippled(const float& dmg, const uint8& lethality);
 	void damageWounded(const float& dmg, const uint8& lethality);
 	void damageHealthy(const float& dmg, const uint8& lethality);
-	void addOrders(const TArray<Order>& newOrders);
 	UFUNCTION() void onPathChanged();
 	UFUNCTION(BlueprintImplementableEvent) void onOrdersChanged();
 public:
@@ -106,20 +106,24 @@ public:
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated) bool team;
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated) FGridIndex position;
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Replicated) HexDirection direction;
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Replicated) HexDirection lastDirection;
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = onOrdersChanged) TArray<Order> orders;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, ReplicatedUsing = onPathChanged) TArray<FGridIndex> path;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) USceneComponent* modelBase;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) uint8 orderProgress;
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) HexDirection lastDirection;
 	UUnitSave* save;
 	AUnit();
 	virtual void Tick(float DeltaTime) override;
 	virtual void GetLifetimeReplicatedProps(TArray< FLifetimeProperty >& OutLifetimeProps) const override;
+	TArray<Order> getOrdersToMoveTo(const FGridIndex& pos) const;
+	bool canAddOrders(const TArray<Order>& newOrders) const;
+	bool isAcceptingCommandsFrom(const APC* pc) const;
+	bool isAcceptingOrdersFrom(const APC* pc) const;
+	bool acceptsOrders(const TArray<Order>& newOrders, const APC* pc) const;
 	void beginTurn();
 	void endTurn();
 	void attack(const AUnit* attacker, const BodyPart& bodyPart, float dmg, float power, uint8 lethality, const float& critRatio);
 	void executeOrder();
-	void queueMove(const FGridIndex& destination);
 	void saveUnit();
 	void init(const FString& pName, const FString& accountUsername, const FUnitStats& pStats, const FGridIndex& pPosition, const HexDirection& pDirection);
 	void init(const FString& pName, AAccount* pAccount, const FUnitStats& pStats, const FGridIndex& pPosition, const HexDirection& pDirection);
@@ -131,8 +135,10 @@ public:
 	UFUNCTION(BlueprintPure) int32 getPersonTotal() const;
 	UFUNCTION(BlueprintPure) int32 getMaxMovementPerTurn() const;
 	UFUNCTION(BlueprintPure) FGridIndex getFinalPosition() const;
-	UFUNCTION(BlueprintPure) bool isMyAccount(AAccount* acc);
+	UFUNCTION(BlueprintPure) HexDirection getFinalDirection() const;
+	UFUNCTION(BlueprintPure) bool isMyAccount(AAccount* acc) const;
 	UFUNCTION(BlueprintCallable) void resetOrders();
+	UFUNCTION(BlueprintCallable) void addOrders(const TArray<Order>& newOrders);
 	UFUNCTION(BlueprintCallable) TArray<FGridIndex> getPossibleMoves() const;
 	UFUNCTION(BlueprintImplementableEvent) void select();
 	UFUNCTION(BlueprintImplementableEvent) void unselect();

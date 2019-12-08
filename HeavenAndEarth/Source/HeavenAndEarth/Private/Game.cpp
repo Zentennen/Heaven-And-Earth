@@ -19,7 +19,9 @@ AGame::AGame()
 void AGame::BeginPlay()
 {
 	Super::BeginPlay();
-	if (HasAuthority() || !IsValid(game)) game = this; //needed so multiple game instances running in editor don't reset game
+	if (HasAuthority() || !IsValid(game)) {
+		game = this; //needed so multiple game instances running in editor don't reset game
+	}
 	if (!HasAuthority()) return;
 	for (TActorIterator<APC> it(GetWorld()); it; ++it) addPC(*it);
 	auto inst = Cast<UGI>(GetGameInstance());
@@ -112,6 +114,7 @@ void AGame::removeUnit(AUnit* unit)
 		debugStr("AGame::removeUnit(): unit was null");
 		return;
 	}
+	if (!game->units.Contains(unit)) return;
 	game->units.Remove(unit);
 	UGameplayStatics::DeleteGameInSlot(unit->getSaveName(), 0);
 	unit->Destroy();
@@ -137,6 +140,7 @@ bool AGame::addPC(APC* pc)
 	}
 	if (game->pcs.Contains(pc)) return false;
 	game->pcs.Emplace(pc);
+	pc->hostInit();
 	return true;
 }
 
@@ -166,6 +170,22 @@ FString AGame::getCampaignName()
 {
 	if (!game) return FString();
 	return game->campaignName;
+}
+
+void AGame::rotateClockwise(HexDirection& dir, uint8 steps)
+{
+	int8 a = (uint8)dir;
+	a++;
+	a = Config::posMod<int8>(a, 6);
+	dir = (HexDirection)a;
+}
+
+void AGame::rotateCounterClockwise(HexDirection& dir, uint8 steps)
+{
+	int8 a = (uint8)dir;
+	a--;
+	a = Config::posMod<int8>(a, 6);
+	dir = (HexDirection)a;
 }
 
 void AGame::executeTurn()
@@ -479,6 +499,20 @@ TArray<FString> AGame::getUsernames()
 TArray<AAccount*> AGame::getAccounts()
 {
 	return game->accounts;
+}
+
+FUnitStats AGame::getUnitStats(FString name)
+{
+	return game->defaultStats[name];
+}
+
+bool AGame::isAcceptingCommands()
+{
+	if (!game) {
+		debugStr("AGame::isAcceptingCommands(): game is null");
+		return false;
+	}
+	return !game->executing && game->finishedLoading;
 }
 
 LoginResult AGame::login(APC* pc, const FString& username, const FString& password)
