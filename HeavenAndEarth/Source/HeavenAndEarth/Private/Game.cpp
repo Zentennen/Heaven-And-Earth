@@ -12,6 +12,10 @@ AGame* AGame::game;
 
 AGame::AGame()
 {
+	bReplicates = true;
+	bReplicateMovement = true;
+	bAlwaysRelevant = true;
+	bNetLoadOnClient = true;
 	PrimaryActorTick.bCanEverTick = true;
 	tiles.Init(FTileColumn(Config::mapY), Config::mapX);
 }
@@ -422,8 +426,6 @@ bool AGame::addUnitToMap(AUnit* unit, const FGridIndex& pos)
 		debugStr("AGame::addUnitToMap(): unit was null");
 		return false;
 	}
-	if (game->tiles[pos.x].units[pos.y] != nullptr) return false;
-	game->tiles[pos.x].units[pos.y] = unit;
 	unit->position = pos;
 	if (!game->tiles[unit->position.x].units[unit->position.y]) game->tiles[unit->position.x].units[unit->position.y] = unit;
 	else {

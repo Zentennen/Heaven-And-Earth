@@ -37,7 +37,8 @@ void APC::playerInit()
 
 void APC::selectUnit(AUnit* u)
 {
-	if (!canCommand(u) || u == selected) return;
+	if (!IsValid(u) || u == selected) return;
+	if (!isGM && !u->isMyAccount(account)) return;
 	if (selected) {
 		selected->unselect();
 		onUnselect();

@@ -317,7 +317,7 @@ FGridIndex AUnit::getFinalPosition() const
 
 HexDirection AUnit::getFinalDirection() const
 {
-	if (path.Num() == 0) return direction;
+	if (orders.Num() == 0) return direction;
 	else return lastDirection;
 }
 
@@ -334,8 +334,8 @@ bool AUnit::isAcceptingCommandsFrom(const APC* pc) const
 		debugStr("AUnit::isAcceptingCommandsFrom(): pc is null");
 		return false;
 	}
-	else if (!AGame::isAcceptingCommands()) return false;
-	else if (pc->getIsGM()) return true;
+	if (!AGame::isAcceptingCommands()) return false;
+	if (pc->getIsGM()) return true;
 	else return isMyAccount(pc->account);
 }
 
