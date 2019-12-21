@@ -4,7 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "Account.generated.h"
 
-class UAccountSave;
+class UCampaignSave;
 
 UENUM(BlueprintType)
 enum class LoginResult : uint8 {
@@ -20,7 +20,6 @@ public:
 	AAccount();
 
 protected:
-	UAccountSave* save;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) int32 id = -1;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) FString username;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) FString password;
@@ -29,10 +28,10 @@ protected:
 public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void GetLifetimeReplicatedProps(TArray< FLifetimeProperty >& OutLifetimeProps) const override;
-	void init(const FString& pUsername, const FString& pPassword);
-	void load(const int32& pId);
+	void init(const FString& pUsername, const FString& pPassword, const int32& i);
+	void load(const int32& i, UCampaignSave* saveGame);
 	FString getUsername() const;
 	LoginResult canLogin(const FString& username, const FString& password);
-	void saveAccount();
+	void save(UCampaignSave* saveGame);
 	UFUNCTION(BlueprintPure) FString getSaveName() const;
 };

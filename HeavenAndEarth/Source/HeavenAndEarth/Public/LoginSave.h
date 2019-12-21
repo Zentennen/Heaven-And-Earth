@@ -17,4 +17,5 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) FString username;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) FString password;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) FString ip;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere) FString campaignName;
 };

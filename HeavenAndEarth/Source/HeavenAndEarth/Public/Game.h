@@ -5,7 +5,9 @@
 #include "GameFramework/Actor.h"
 #include "Game.generated.h"
 
-class UCampaignSave;
+#define LOAD_GAME Cast<UCampaignSave>(UGameplayStatics::LoadGameFromSlot(getSaveName(), 0))
+#define LOAD_GAME_STATIC Cast<UCampaignSave>(UGameplayStatics::LoadGameFromSlot(game->getSaveName(), 0))
+#define CREATE_GAME_SAVE Cast<UCampaignSave>(UGameplayStatics::CreateSaveGameObject(UCampaignSave::StaticClass()))
 
 USTRUCT(BlueprintType)
 struct FTileColumn {
@@ -34,13 +36,14 @@ class HEAVENANDEARTH_API AGame : public AActor
 	GENERATED_BODY()
 protected:
 	static AGame* game;
-	UCampaignSave* save;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) TMap<FString, FUnitStats> defaultStats;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) FString campaignName;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) float timer;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) uint8 counter;
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) uint8 unitCounter;
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) uint8 accountCounter;
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) int32 unitCounter;
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) int32 accountCounter;
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) int32 numAccounts;
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) int32 numUnits;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) TArray<AUnit*> units;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) TArray<AAccount*> accounts;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere) TArray<APC*> pcs;
@@ -53,6 +56,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	UFUNCTION(BlueprintImplementableEvent) void onRepExecuting();
 	UFUNCTION(BlueprintImplementableEvent) void onRepFinishedLoading();
+	UFUNCTION(BlueprintImplementableEvent) void spawnUnit(AUnit*& u);
 
 public:
 	AGame();
@@ -64,10 +68,10 @@ public:
 	static int32 addAccount(AAccount* account);
 	static void removeUnit(AUnit* unit);
 	static void removeAccount(AAccount* account);
-	static bool canCompleteOrder(AUnit* unit);
 	static FString getCampaignName();
 	static void rotateClockwise(HexDirection& dir, uint8 steps = 1);
 	static void rotateCounterClockwise(HexDirection& dir, uint8 steps = 1);
+	static UCampaignSave* getSave();
 	UFUNCTION(BlueprintPure) static bool isValidPos(const FGridIndex& pos);
 	UFUNCTION(BlueprintPure) static bool isOpenPos(const FGridIndex& pos);
 	UFUNCTION(BlueprintPure) static int32 manhattanDistance(const FGridIndex& start, const FGridIndex& goal);
@@ -87,6 +91,7 @@ public:
 	UFUNCTION(BlueprintPure) static TArray<AAccount*> getAccounts();
 	UFUNCTION(BlueprintPure) static FUnitStats getUnitStats(FString name);
 	UFUNCTION(BlueprintPure) static bool isAcceptingCommands();
+	UFUNCTION(BlueprintCallable) static AUnit* createAndInitializeUnit(AAccount* acc, const FUnitData& data);
 	UFUNCTION(BlueprintCallable) static void saveGame();
 	UFUNCTION(BlueprintCallable) static void executeTurn();
 	UFUNCTION(BlueprintCallable) static bool setTile(const FTile& t);

@@ -3,9 +3,9 @@
 #include "Engine.h"
 #include "Scenery.h"
 #include "UnitSave.h"
-#include "GI.h"
 #include "CampaignSave.h"
 #include "Engine.h"
+#include "LoginSave.h"
 #include <cmath>
 
 AGame* AGame::game;
@@ -23,18 +23,30 @@ AGame::AGame()
 void AGame::BeginPlay()
 {
 	Super::BeginPlay();
-	if (HasAuthority() || !IsValid(game)) {
+	if (HasAuthority() || !game) {
 		game = this; //needed so multiple game instances running in editor don't reset game
+	}
+	else {
+		//debugStr("Game could not be set");
 	}
 	if (!HasAuthority()) return;
 	for (TActorIterator<APC> it(GetWorld()); it; ++it) addPC(*it);
-	auto inst = Cast<UGI>(GetGameInstance());
-	campaignName = inst->campaignName;
-	save = Cast<UCampaignSave>(UGameplayStatics::LoadGameFromSlot(getSaveName(), 0));
-	if (!save) {
-		save = Cast<UCampaignSave>(UGameplayStatics::CreateSaveGameObject(UCampaignSave::StaticClass()));
+	auto loginSave = Cast<ULoginSave>(UGameplayStatics::LoadGameFromSlot("Login", 0));
+	if(loginSave) campaignName = loginSave->campaignName;
+	if (campaignName == "") {
 		finishedLoading = true;
 		onRepFinishedLoading();
+		return;
+	}
+	auto save = LOAD_GAME;
+	if (!save) {
+		debugStr("Creating new save for this campaign");
+		finishedLoading = true;
+		onRepFinishedLoading();
+	}
+	else {
+		numAccounts = save->numAccounts;
+		numUnits = save->numUnits;
 	}
 }
 
@@ -63,13 +75,17 @@ void AGame::Tick(float DeltaTime)
 	}
 	else if (!finishedLoading) {
 		auto world = GetWorld();
-		if (accountCounter < save->numAccounts) {
+		auto save = LOAD_GAME;
+		if (accountCounter < numAccounts) {
 			auto acc = world->SpawnActor<AAccount>();
-			acc->load(accountCounter);
+			acc->load(addAccount(acc), save);
+			accountCounter++;
 		}
-		else if (unitCounter < save->numUnits) {
-			auto unit = world->SpawnActor<AUnit>();
-			unit->load(unitCounter);
+		else if (unitCounter < numUnits) {
+			AUnit* u = nullptr;
+			spawnUnit(u);
+			u->load(addUnit(u), save);
+			unitCounter++;
 		}
 		else {
 			finishedLoading = true;
@@ -148,27 +164,27 @@ bool AGame::addPC(APC* pc)
 	return true;
 }
 
-bool AGame::canCompleteOrder(AUnit* unit)
-{
-	if (!unit) return false;
-	if (unit->orders.Num() == 0) return true;
-	switch (unit->orders[0]) {
-	case Order::Rest: return true;
-	case Order::Move: {
-		auto gi = movementToGridIndex(unit->direction, unit->position);
-		if (!isValidPos(gi)) return false;
-		if (game->tiles[gi.x].units[gi.y]) return false;
-		return unit->orderProgress * unit->getStats().movementSpeed >= game->tiles[gi.x].costs[gi.y];
-	}
-	case Order::Rotate: {
-		return unit->orderProgress * unit->getStats().rotationSpeed >= Config::rotationNeeded;
-	}
-	case Order::CounterRotate: {
-		return unit->orderProgress * unit->getStats().rotationSpeed >= Config::rotationNeeded;
-	}
-	default: return true;
-	}
-}
+//bool AGame::canCompleteOrder(AUnit* unit)
+//{
+//	if (!unit) return false;
+//	if (unit->orders.Num() == 0) return true;
+//	switch (unit->orders[0]) {
+//	case Order::Rest: return true;
+//	case Order::Move: {
+//		auto gi = movementToGridIndex(unit->direction, unit->position);
+//		if (!isValidPos(gi)) return false;
+//		if (game->tiles[gi.x].units[gi.y]) return false;
+//		return unit->orderProgress * unit->getStats().movementSpeed >= game->tiles[gi.x].costs[gi.y];
+//	}
+//	case Order::Rotate: {
+//		return unit->orderProgress * unit->getStats().rotationSpeed >= Config::rotationNeeded;
+//	}
+//	case Order::CounterRotate: {
+//		return unit->orderProgress * unit->getStats().rotationSpeed >= Config::rotationNeeded;
+//	}
+//	default: return true;
+//	}
+//}
 
 FString AGame::getCampaignName()
 {
@@ -190,6 +206,15 @@ void AGame::rotateCounterClockwise(HexDirection& dir, uint8 steps)
 	a--;
 	a = Config::posMod<int8>(a, 6);
 	dir = (HexDirection)a;
+}
+
+UCampaignSave* AGame::getSave()
+{
+	if (!game) {
+		debugStr("AGame::getSave(): game is null");
+		return nullptr;
+	}
+	return Cast<UCampaignSave>(UGameplayStatics::LoadGameFromSlot(game->getSaveName(), 0));
 }
 
 void AGame::executeTurn()
@@ -396,13 +421,15 @@ bool AGame::moveUnit(AUnit* unit)
 		debugStr("AGame::moveUnit(): unit was null");
 		return false;
 	}
-	auto newPos = movementToGridIndex(unit->direction, unit->position);
+	auto position = unit->getData().position;
+	auto direction = unit->getData().direction;
+	auto newPos = movementToGridIndex(direction, position);
 	if (!isValidPos(newPos)) return false;
 	if (game->tiles[newPos.x].units[newPos.y]) return false;
 	game->tiles[newPos.x].units[newPos.y] = unit;
-	if (game->tiles[unit->position.x].units[unit->position.y] == unit) game->tiles[unit->position.x].units[unit->position.y] = nullptr;
+	if (game->tiles[position.x].units[position.y] == unit) game->tiles[position.x].units[position.y] = nullptr;
 	else debugStr("AGame::moveUnit(): unit was not at its position");
-	unit->position = newPos;
+	unit->setPosition(newPos);
 	return true;
 }
 
@@ -412,11 +439,12 @@ bool AGame::teleportUnit(AUnit* unit, const FGridIndex& pos)
 		debugStr("AGame::teleportUnit(): unit was null");
 		return false;
 	}
+	auto position = unit->getData().position;
 	if (game->tiles[pos.x].units[pos.y] != nullptr) return false;
 	game->tiles[pos.x].units[pos.y] = unit;
-	if (game->tiles[unit->position.x].units[unit->position.y] == unit) game->tiles[unit->position.x].units[unit->position.y] = nullptr;
+	if (game->tiles[position.x].units[position.y] == unit) game->tiles[position.x].units[position.y] = nullptr;
 	else debugStr("AGame::teleportUnit(): unit was not at its position");
-	unit->position = pos;
+	unit->setPosition(pos);
 	return true;
 }
 
@@ -426,20 +454,22 @@ bool AGame::addUnitToMap(AUnit* unit, const FGridIndex& pos)
 		debugStr("AGame::addUnitToMap(): unit was null");
 		return false;
 	}
-	unit->position = pos;
-	if (!game->tiles[unit->position.x].units[unit->position.y]) game->tiles[unit->position.x].units[unit->position.y] = unit;
+	if (!game->tiles[pos.x].units[pos.y]) {
+		game->tiles[pos.x].units[pos.y] = unit;
+		unit->setPosition(pos);
+	}
 	else {
 		TArray<FGridIndex> open;
 		TArray<FGridIndex> closed;
 		open.Empty();
 		closed.Empty();
-		open.Append(getRingOfGridIndices(unit->position));
-		closed.Emplace(unit->position);
+		open.Append(getRingOfGridIndices(pos));
+		closed.Emplace(pos);
 		while (true) {
 			for (auto i : open) {
 				if (!game->tiles[i.x].units[i.y]) {
-					unit->position = i;
 					game->tiles[i.x].units[i.y] = unit;
+					unit->setPosition(i);
 					return true;
 				}
 				else closed.Emplace(i);
@@ -476,7 +506,7 @@ bool AGame::createAccount(APC* pc, const FString& username, const FString& passw
 		if (i->canLogin(username, password) != LoginResult::NotRegistered) return false;
 	}
 	auto acc = pc->GetWorld()->SpawnActor<AAccount>(FVector::ZeroVector, FRotator::ZeroRotator);
-	acc->init(username, password);
+	acc->init(username, password, addAccount(acc));
 	login(pc, username, password);
 	return true;
 }
@@ -517,6 +547,15 @@ bool AGame::isAcceptingCommands()
 	return !game->executing && game->finishedLoading;
 }
 
+AUnit* AGame::createAndInitializeUnit(AAccount* acc, const FUnitData& data)
+{
+	if (!isAcceptingCommands() || !game->HasAuthority() || !AGame::isValidPos(data.position)) return nullptr;
+	AUnit* u = nullptr;
+	game->spawnUnit(u);
+	u->init(data, acc, addUnit(u));
+	return u;
+}
+
 LoginResult AGame::login(APC* pc, const FString& username, const FString& password)
 {
 	for (auto i : game->accounts) {
@@ -524,6 +563,7 @@ LoginResult AGame::login(APC* pc, const FString& username, const FString& passwo
 		switch (result) {
 		case LoginResult::Success:
 			pc->account = i;
+			debugFstr(username + FString(TEXT(" logged in")));
 			return LoginResult::Success;
 		case LoginResult::Fail:
 			return LoginResult::Fail;
@@ -560,7 +600,7 @@ TArray<FGridIndex> AGame::getRingOfGridIndices(const FGridIndex& gi, int32 radiu
 	TArray<FGridIndex> ret;
 	ret.Empty();
 	if (radius < 0) return ret;
-	if (radius == 0) ret.Emplace(gi);
+	else if (radius == 0) ret.Emplace(gi);
 	else for (uint8 j = 0; j < 6; j++) {
 		auto a = movementToGridIndex((HexDirection)j, gi, radius);
 		if (isValidPos(a)) ret.Emplace(a);
@@ -618,13 +658,26 @@ bool AGame::hasGameStarted()
 
 void AGame::saveGame()
 {
-	game->save->numAccounts = game->accounts.Num();
-	game->save->numUnits = game->units.Num();
-	UGameplayStatics::SaveGameToSlot(game->save, game->getSaveName(), 0);
+	if (!IsValid(game)) {
+		debugStr("AGame::saveGame(): game is invalid");
+		return;
+	}
+	if (game->campaignName == "") {
+		debugStr("There is no campaign name. The game will not be saved");
+		return;
+	}
+	if (!isAcceptingCommands()) {
+		debugStr("Game was not accepting commands. Could not save game");
+		return;
+	}
+	auto save = CREATE_GAME_SAVE;
+	save->numAccounts = game->accounts.Num();
+	save->numUnits = game->units.Num();
 	for (auto i : game->accounts) {
-		i->saveAccount();
+		i->save(save);
 	}
 	for (auto i : game->units) {
-		i->saveUnit();
+		i->save(save);
 	}
+	UGameplayStatics::AsyncSaveGameToSlot(save, game->getSaveName(), 0);
 }

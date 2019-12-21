@@ -46,7 +46,7 @@ void APC::selectUnit(AUnit* u)
 	selected = u;
 	u->select();
 	updateMoveMarkers();
-	updatePathMarkers(selected->path);
+	updatePathMarkers(selected->PATH);
 	onSelect(u);
 }
 
@@ -65,6 +65,16 @@ void APC::setCursor(const FGridIndex& pos)
 	if (IsValid(cursorMarker)) cursorMarker->setPos(pos);
 }
 
+//void APC::onEndTurn_Implementation()
+//{
+//	updateMoveMarkers();
+//}
+//
+//void APC::onBeginTurn_Implementation()
+//{
+//	updateMoveMarkers();
+//}
+
 bool APC::requestAccount_Validate(const FString& username, const FString& password)
 {
 	return username != "" && password != "" && AGame::canLogin(this, username, password);
@@ -77,6 +87,9 @@ void APC::requestAccount_Implementation(const FString& username, const FString& 
 
 bool APC::tryLogin_Validate(const FString& username, const FString& password)
 {
+	if (username == "") printMsg("Kicked: Username cannot be empty");
+	if (password == "") printMsg("Kicked: Password cannot be empty");
+	if (!AGame::canLogin(this, username, password)) printMsg("Kicked: Incorrect password");
 	return username != "" && password != "" && AGame::canLogin(this, username, password);
 }
 
@@ -111,17 +124,9 @@ void APC::hideMoveMarkers()
 void APC::updateMoveMarkers()
 {
 	if (!canCommand(selected)) hideMoveMarkers();
-	else setMoveMarkers(selected->getPossibleMoves());
-}
-
-bool APC::createUnit(FString name, AAccount* acc, const FUnitStats& stats, const FGridIndex& position, HexDirection direction)
-{
-	if (!HasAuthority() || !AGame::isValidPos(position) || !AGame::isAcceptingCommands()) return false;
-	AUnit* u = nullptr;
-	spawnUnit(u, AGame::gridIndexToVector(position), FRotator::ZeroRotator);
-	if (!u) return false;
-	u->init(name, acc, stats, position, direction);
-	return true;
+	else {
+		setMoveMarkers(selected->getPossibleMoves());
+	}
 }
 
 bool APC::tryMoveSelected(const FGridIndex& destination)
@@ -141,6 +146,18 @@ bool APC::tryMoveSelected(const FGridIndex& destination)
 	return true;
 }
 
+bool APC::tryResetOrders()
+{
+	if (!canOrder(selected)) return false;
+	resetOrders(selected);
+	return true;
+}
+
+void APC::printMsg_Implementation(const FString& msg)
+{
+	debugFstr(msg);
+}
+
 void APC::requestLogin_Implementation()
 {
 	auto save = Cast<ULoginSave, USaveGame>(UGameplayStatics::LoadGameFromSlot("Login", 0));
@@ -155,12 +172,12 @@ void APC::requestLogin_Implementation()
 
 void APC::beginTurn()
 {
-	updateMoveMarkers();
+
 }
 
 void APC::endTurn()
 {
-	updateMoveMarkers();
+
 }
 
 bool APC::canCommand(const AUnit* unit) const
@@ -216,4 +233,14 @@ void APC::orderUnit_Implementation(AUnit* u, const TArray<Order>& orders)
 	if (!u) return;
 	else if (!u->acceptsOrders(orders, this)) return;
 	else u->addOrders(orders);
+}
+
+bool APC::resetOrders_Validate(AUnit* u) {
+	return true;
+}
+
+void APC::resetOrders_Implementation(AUnit* u)
+{
+	if (!canOrder(u)) return;
+	else u->resetOrders();
 }

@@ -14,5 +14,4 @@ class HEAVENANDEARTH_API UGI : public UGameInstance
 {
 	GENERATED_BODY()
 public:
-	FString campaignName;
 };

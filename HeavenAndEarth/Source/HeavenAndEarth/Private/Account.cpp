@@ -1,6 +1,6 @@
 #include "Account.h"
 #include "Game.h"
-#include "AccountSave.h"
+#include "CampaignSave.h"
 #include "Engine.h"
 
 AAccount::AAccount()
@@ -17,31 +17,22 @@ void AAccount::BeginPlay()
 
 }
 
-void AAccount::init(const FString& pUsername, const FString& pPassword)
+void AAccount::init(const FString& pUsername, const FString& pPassword, const int32& i)
 {
 	if (id != -1) {
 		debugStr("AAccount::init(): account was already initialized");
 		return;
 	}
-	id = AGame::addAccount(this);
-	if (id == -1) {
-		debugStr("AAccount::init(): could not add account");
-		AGame::removeAccount(this);
-		return;
-	}
-	if (UGameplayStatics::LoadGameFromSlot(getSaveName(), 0)) debugStr("AAccount::init(): save already exists");
-	save = Cast<UAccountSave>(UGameplayStatics::CreateSaveGameObject(UAccountSave::StaticClass()));
+	id = i;
 	username = pUsername;
 	password = pPassword;
 }
 
-void AAccount::load(const int32& pId)
+void AAccount::load(const int32& i, UCampaignSave* saveGame)
 {
-	id = pId;
-	save = Cast<UAccountSave>(UGameplayStatics::LoadGameFromSlot(getSaveName(), 0));
-	username = save->username;
-	password = save->password;
-	id = AGame::addAccount(this);
+	id = i;
+	username = saveGame->accountUsernames[i];
+	password = saveGame->accountPasswords[i];
 }
 
 FString AAccount::getUsername() const
@@ -69,11 +60,10 @@ LoginResult AAccount::canLogin(const FString& u, const FString& p)
 	else return LoginResult::NotRegistered;
 }
 
-void AAccount::saveAccount()
+void AAccount::save(UCampaignSave* saveGame)
 {
-	save->username = username;
-	save->password = password;
-	UGameplayStatics::SaveGameToSlot(save, getSaveName(), 0);
+	saveGame->accountUsernames.Emplace(username);
+	saveGame->accountPasswords.Emplace(password);
 }
 
 FString AAccount::getSaveName() const

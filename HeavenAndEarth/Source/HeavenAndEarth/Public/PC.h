@@ -26,12 +26,12 @@ protected:
 	UFUNCTION(Client, Reliable) void returnLoginResult(LoginResult result);
 	UFUNCTION(Server, Reliable, WithValidation) void tryLogin(const FString& username, const FString& password);
 	UFUNCTION(Server, Reliable, WithValidation) void orderUnit(AUnit* u, const TArray<Order>& orders);
+	UFUNCTION(Server, Reliable, WithValidation) void resetOrders(AUnit* u);
 	UFUNCTION(BlueprintImplementableEvent) void onSelect(AUnit* selectedUnit);
 	UFUNCTION(BlueprintImplementableEvent) void onUnselect();
 	UFUNCTION(BlueprintImplementableEvent) void onLoginAttempt(const LoginResult& result);
 	UFUNCTION(BlueprintImplementableEvent) void onPlayerInit();
 	UFUNCTION(BlueprintImplementableEvent) void onHostInit();
-	UFUNCTION(BlueprintImplementableEvent) void spawnUnit(AUnit*& u, const FVector& pos, const FRotator& rot);
 public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) AUnit* selected;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Replicated) AAccount* account;
@@ -45,9 +45,10 @@ public:
 	UFUNCTION(BlueprintCallable) void playerInit();
 	UFUNCTION(BlueprintCallable) void updatePathMarkers(const TArray<FGridIndex>& newPath);
 	UFUNCTION(BlueprintCallable) void updateMoveMarkers();
-	UFUNCTION(BlueprintCallable) bool createUnit(FString name, AAccount* acc, const FUnitStats& stats, const FGridIndex& position, HexDirection direction);
 	UFUNCTION(BlueprintCallable) bool tryMoveSelected(const FGridIndex& destination);
+	UFUNCTION(BlueprintCallable) bool tryResetOrders();
 	UFUNCTION(Client, Reliable) void requestLogin();
+	UFUNCTION(Client, Reliable) void printMsg(const FString& msg);
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation) void requestAccount(const FString& username, const FString& password);
 	UFUNCTION(BlueprintImplementableEvent) void show();
 	UFUNCTION(BlueprintImplementableEvent) void hide();
