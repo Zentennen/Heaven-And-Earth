@@ -6,7 +6,6 @@
 AAccount::AAccount()
 {
 	bReplicates = true;
-	bReplicateMovement = true;
 	bAlwaysRelevant = true;
 	bNetLoadOnClient = true;
 }

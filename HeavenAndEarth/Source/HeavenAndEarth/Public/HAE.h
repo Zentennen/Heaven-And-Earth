@@ -1,6 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
-#include "Config.generated.h"
+#include "HAE.generated.h"
 
 #define INVALID_GI FGridIndex(-1, -1)
 #define INVALID_TILE Tile()
@@ -25,6 +25,10 @@ enum class TileProperty : uint8 {
 	Impassable
 };
 
+UENUM(BlueprintType)
+enum class LoginResult : uint8 {
+	Success, Fail, NotRegistered
+};
 
 USTRUCT(BlueprintType)
 struct FGridIndex {
@@ -108,7 +112,7 @@ struct FTile {
 	}
 };
 
-namespace Config {
+namespace HAE {
 	const uint8 strongHitPowerNeeded = 8;
 	const uint8 strongHitTalentPowerNeeded = 5;
 	const uint8 weakHitPowerNeeded = 5;

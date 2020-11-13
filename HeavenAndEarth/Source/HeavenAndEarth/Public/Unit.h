@@ -1,5 +1,5 @@
 #pragma once
-#include "Config.h"
+#include "HAE.h"
 #include "Unit.generated.h"
 
 #define PATH path.path
@@ -102,17 +102,6 @@ struct FUnitStats {
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) FArmor legArmor;
 	//perks
 	UPROPERTY(BlueprintReadWrite, EditAnywhere) TArray<Perk> perks;
-	//FUnitStats operator=(const FUnitStats& other) {
-	//	maxFormationStrength = other.maxFormationStrength; formationStrength = other.formationStrength; formationStrengthRecovery = other.formationStrengthRecovery;
-	//	dead = other.dead; crippled = other.crippled; wounded = other.wounded; healthy = other.healthy;
-	//	maxMorale = other.maxMorale; morale = other.maxMorale; moraleRecovery = other.moraleRecovery;
-	//	maxStamina = other.maxStamina; stamina = other.stamina; staminaLimit = other.staminaLimit; staminaRecovery = other.staminaRecovery; staminaLimitRecovery = other.staminaLimitRecovery;
-	//	damageMult = other.damageMult; powerMult = other.powerMult;
-	//	movementSpeed = other.movementSpeed; rotationSpeed = other.rotationSpeed;
-	//	headArmor = other.headArmor; torsoArmor = other.torsoArmor; armArmor = other.armArmor; legArmor = other.legArmor;
-	//	perks = other.perks;
-	//	return *this;
-	//}
 };
 
 USTRUCT(BlueprintType)

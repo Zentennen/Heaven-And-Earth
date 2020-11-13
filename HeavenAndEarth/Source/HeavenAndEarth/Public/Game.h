@@ -1,9 +1,10 @@
 #pragma once
-#include "Unit.h"
-#include "Account.h"
-#include "PC.h"
 #include "GameFramework/Actor.h"
 #include "Game.generated.h"
+
+class AAccount;
+class AUnit;
+class APC;
 
 #define LOAD_GAME Cast<UCampaignSave>(UGameplayStatics::LoadGameFromSlot(getSaveName(), 0))
 #define LOAD_GAME_STATIC Cast<UCampaignSave>(UGameplayStatics::LoadGameFromSlot(game->getSaveName(), 0))

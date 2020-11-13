@@ -1,4 +1,7 @@
 #include "Game.h"
+#include "Account.h"
+#include "Unit.h"
+#include "PC.h"
 #include "UnrealNetwork.h"
 #include "Engine.h"
 #include "Scenery.h"
@@ -13,11 +16,10 @@ AGame* AGame::game;
 AGame::AGame()
 {
 	bReplicates = true;
-	bReplicateMovement = true;
 	bAlwaysRelevant = true;
 	bNetLoadOnClient = true;
 	PrimaryActorTick.bCanEverTick = true;
-	tiles.Init(FTileColumn(Config::mapY), Config::mapX);
+	tiles.Init(FTileColumn(HAE::mapY), HAE::mapX);
 }
 
 void AGame::BeginPlay()
@@ -177,10 +179,10 @@ bool AGame::addPC(APC* pc)
 //		return unit->orderProgress * unit->getStats().movementSpeed >= game->tiles[gi.x].costs[gi.y];
 //	}
 //	case Order::Rotate: {
-//		return unit->orderProgress * unit->getStats().rotationSpeed >= Config::rotationNeeded;
+//		return unit->orderProgress * unit->getStats().rotationSpeed >= HAE::rotationNeeded;
 //	}
 //	case Order::CounterRotate: {
-//		return unit->orderProgress * unit->getStats().rotationSpeed >= Config::rotationNeeded;
+//		return unit->orderProgress * unit->getStats().rotationSpeed >= HAE::rotationNeeded;
 //	}
 //	default: return true;
 //	}
@@ -196,7 +198,7 @@ void AGame::rotateClockwise(HexDirection& dir, uint8 steps)
 {
 	int8 a = (uint8)dir;
 	a++;
-	a = Config::posMod<int8>(a, 6);
+	a = HAE::posMod<int8>(a, 6);
 	dir = (HexDirection)a;
 }
 
@@ -204,7 +206,7 @@ void AGame::rotateCounterClockwise(HexDirection& dir, uint8 steps)
 {
 	int8 a = (uint8)dir;
 	a--;
-	a = Config::posMod<int8>(a, 6);
+	a = HAE::posMod<int8>(a, 6);
 	dir = (HexDirection)a;
 }
 
@@ -229,7 +231,7 @@ void AGame::executeTurn()
 
 bool AGame::isValidPos(const FGridIndex& pos)
 {
-	if (pos.x < 0 || pos.x >= Config::mapX || pos.y < 0 || pos.y >= Config::mapY) return false;
+	if (pos.x < 0 || pos.x >= HAE::mapX || pos.y < 0 || pos.y >= HAE::mapY) return false;
 	else return true;
 }
 
@@ -326,11 +328,11 @@ APC* AGame::getLocalPC()
 
 FGridIndex AGame::vectorToGridIndex(const FVector& vec)
 {
-	float x = vec.Y / Config::hexSize;
-	float y = vec.X / Config::hexY;
+	float x = vec.Y / HAE::hexSize;
+	float y = vec.X / HAE::hexY;
 	FGridIndex gi(FMath::FloorToInt(x), FMath::FloorToInt(y));
 	if (gi.y % 2 == 0) {
-		if (y - gi.y > Config::third + Config::twoThirds * FMath::Abs(x - gi.x - 0.5f)) {
+		if (y - gi.y > HAE::third + HAE::twoThirds * FMath::Abs(x - gi.x - 0.5f)) {
 			gi.y += 1;
 			gi.x += 1;
 			return gi;
@@ -341,7 +343,7 @@ FGridIndex AGame::vectorToGridIndex(const FVector& vec)
 		}
 	}
 	else {
-		if (y - gi.y > Config::twoThirds - Config::twoThirds * FMath::Abs(x - gi.x - 0.5f)) {
+		if (y - gi.y > HAE::twoThirds - HAE::twoThirds * FMath::Abs(x - gi.x - 0.5f)) {
 			gi.y += 1;
 			gi.x = FMath::FloorToInt(x + 0.5f);
 			return gi;
@@ -361,8 +363,8 @@ FGridIndex AGame::vector2DToGridIndex(const FVector2D& vec)
 
 FVector AGame::gridIndexToVector(const FGridIndex& gi, float z)
 {
-	if (gi.y % 2 == 0) return FVector(gi.y * Config::hexY, gi.x * Config::hexSize, z);
-	else return FVector(gi.y * Config::hexY, gi.x * Config::hexSize - Config::hexHalfSize, z);
+	if (gi.y % 2 == 0) return FVector(gi.y * HAE::hexY, gi.x * HAE::hexSize, z);
+	else return FVector(gi.y * HAE::hexY, gi.x * HAE::hexSize - HAE::hexHalfSize, z);
 }
 
 FVector2D AGame::gridIndexToVector2D(const FGridIndex& gi)

@@ -27,7 +27,7 @@ void FArmorLayer::repairPercentage(FArmorLayer layer, uint8 percent)
 AUnit::AUnit()
 {
 	bReplicates = true;
-	bReplicateMovement = true;
+	SetReplicateMovement(true);
 	bAlwaysRelevant = true;
 	bNetLoadOnClient = true;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root Component"));
@@ -165,7 +165,7 @@ TArray<Order> AUnit::getOrdersToMoveTo(const FGridIndex& pos) const
 
 bool AUnit::canAddOrders(const TArray<Order>& newOrders) const
 {
-	return ORDERS.Num() + newOrders.Num() <= Config::maxOrders;
+	return ORDERS.Num() + newOrders.Num() <= HAE::maxOrders;
 }
 
 void AUnit::beginTurn()
@@ -192,7 +192,7 @@ void AUnit::attack(AUnit* attacker, const BodyPart& bodyPart, float dmg, float p
 		break;
 	case BodyPart::Torso:
 		armor = baseStats.torsoArmor;
-		power *= Config::torsoPowerMult;
+		power *= HAE::torsoPowerMult;
 		break;
 	case BodyPart::Arms:
 		armor = baseStats.armArmor;
@@ -210,9 +210,9 @@ void AUnit::attack(AUnit* attacker, const BodyPart& bodyPart, float dmg, float p
 		for (uint8 j = 0; j < armor.pieces[i].layers.Num(); j++) {
 			FArmorLayer layer = armor.pieces[i].layers[j];
 			p -= layer.protection;
-			FArmorLayer::damage(layer, d * (p + Config::conditionDamagePowerBonus));
+			FArmorLayer::damage(layer, d * (p + HAE::conditionDamagePowerBonus));
 		}
-		int32 critThreshold = attacker->getStats().perks.Contains(Perk::Ruthless) ? Config::strongHitTalentPowerNeeded : Config::strongHitPowerNeeded;
+		int32 critThreshold = attacker->getStats().perks.Contains(Perk::Ruthless) ? HAE::strongHitTalentPowerNeeded : HAE::strongHitPowerNeeded;
 		if (p >= critThreshold) {
 			l += 1;
 		}
@@ -253,10 +253,10 @@ void AUnit::executeOrder()
 	}
 	case Order::Rotate: {
 		data.orderProgress += stats.rotationSpeed;
-		if (Config::rotationNeeded > data.orderProgress) return;
+		if (HAE::rotationNeeded > data.orderProgress) return;
 		int8 a = (uint8)data.direction;
 		a++;
-		a = Config::posMod<int8>(a, 6);
+		a = HAE::posMod<int8>(a, 6);
 		data.direction = (HexDirection)a;
 		modelBase->SetWorldRotation(AGame::hexDirectionToRotation(data.direction));
 		completeOrder();
@@ -264,10 +264,10 @@ void AUnit::executeOrder()
 	}
 	case Order::CounterRotate: {
 		data.orderProgress += stats.rotationSpeed;
-		if (Config::rotationNeeded > data.orderProgress) return;
+		if (HAE::rotationNeeded > data.orderProgress) return;
 		int8 a = (uint8)data.direction;
 		a--;
-		a = Config::posMod<int8>(a, 6);
+		a = HAE::posMod<int8>(a, 6);
 		data.direction = (HexDirection)a;
 		modelBase->SetWorldRotation(AGame::hexDirectionToRotation(data.direction));
 		completeOrder();
@@ -386,7 +386,7 @@ TArray<FGridIndex> AUnit::getPossibleMoves() const
 	ret.Empty();
 	auto ring = AGame::getRingOfGridIndices(getFinalPosition());
 	for (auto i : ring) {
-		if (getOrdersToMoveTo(i).Num() + ORDERS.Num() <= Config::maxOrders) ret.Emplace(i);
+		if (getOrdersToMoveTo(i).Num() + ORDERS.Num() <= HAE::maxOrders) ret.Emplace(i);
 	}
 	return ret;
 }

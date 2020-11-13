@@ -5,10 +5,11 @@ using System.Collections.Generic;
 
 public class HeavenAndEarthEditorTarget : TargetRules
 {
+	
 	public HeavenAndEarthEditorTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Editor;
-
+		//DefaultBuildSettings = BuildSettingsVersion.V2;
 		ExtraModuleNames.AddRange( new string[] { "HeavenAndEarth" } );
 	}
 }

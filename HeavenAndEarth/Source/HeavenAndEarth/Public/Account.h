@@ -1,15 +1,10 @@
 #pragma once
-
+#include "HAE.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Account.generated.h"
 
 class UCampaignSave;
-
-UENUM(BlueprintType)
-enum class LoginResult : uint8 {
-	Success, Fail, NotRegistered
-};
 
 UCLASS()
 class HEAVENANDEARTH_API AAccount : public AActor
