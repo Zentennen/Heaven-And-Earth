@@ -1,6 +1,6 @@
 #include "GM.h"
 #include "PC.h"
-#include "Config.h"
+#include "HAE.h"
 #include "Engine.h"
 
 void AGM::PostLogin(APlayerController* NewPlayer)

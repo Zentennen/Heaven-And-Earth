@@ -2,10 +2,9 @@
 #include "Account.h"
 #include "Unit.h"
 #include "PC.h"
-#include "UnrealNetwork.h"
+#include "Net/UnrealNetwork.h"
 #include "Engine.h"
 #include "Scenery.h"
-#include "UnitSave.h"
 #include "CampaignSave.h"
 #include "Engine.h"
 #include "LoginSave.h"
@@ -25,13 +24,12 @@ AGame::AGame()
 void AGame::BeginPlay()
 {
 	Super::BeginPlay();
-	if (HasAuthority() || !game) {
-		game = this; //needed so multiple game instances running in editor don't reset game
+	if (HasAuthority()) {
+		game = this;
 	}
 	else {
-		//debugStr("Game could not be set");
+		return;
 	}
-	if (!HasAuthority()) return;
 	for (TActorIterator<APC> it(GetWorld()); it; ++it) addPC(*it);
 	auto loginSave = Cast<ULoginSave>(UGameplayStatics::LoadGameFromSlot("Login", 0));
 	if(loginSave) campaignName = loginSave->campaignName;
@@ -40,7 +38,7 @@ void AGame::BeginPlay()
 		onRepFinishedLoading();
 		return;
 	}
-	auto save = LOAD_GAME;
+	auto save = Cast<UCampaignSave>(UGameplayStatics::LoadGameFromSlot(getSaveName(), 0));
 	if (!save) {
 		debugStr("Creating new save for this campaign");
 		finishedLoading = true;
@@ -77,7 +75,7 @@ void AGame::Tick(float DeltaTime)
 	}
 	else if (!finishedLoading) {
 		auto world = GetWorld();
-		auto save = LOAD_GAME;
+		auto save = Cast<UCampaignSave>(UGameplayStatics::LoadGameFromSlot(getSaveName(), 0));
 		if (accountCounter < numAccounts) {
 			auto acc = world->SpawnActor<AAccount>();
 			acc->load(addAccount(acc), save);
@@ -136,9 +134,7 @@ void AGame::removeUnit(AUnit* unit)
 		debugStr("AGame::removeUnit(): unit was null");
 		return;
 	}
-	if (!game->units.Contains(unit)) return;
 	game->units.Remove(unit);
-	UGameplayStatics::DeleteGameInSlot(unit->getSaveName(), 0);
 	unit->Destroy();
 }
 
@@ -149,7 +145,6 @@ void AGame::removeAccount(AAccount* account)
 		return;
 	}
 	game->accounts.Remove(account);
-	UGameplayStatics::DeleteGameInSlot(account->getSaveName(), 0);
 	account->Destroy();
 }
 
@@ -208,15 +203,6 @@ void AGame::rotateCounterClockwise(HexDirection& dir, uint8 steps)
 	a--;
 	a = HAE::posMod<int8>(a, 6);
 	dir = (HexDirection)a;
-}
-
-UCampaignSave* AGame::getSave()
-{
-	if (!game) {
-		debugStr("AGame::getSave(): game is null");
-		return nullptr;
-	}
-	return Cast<UCampaignSave>(UGameplayStatics::LoadGameFromSlot(game->getSaveName(), 0));
 }
 
 void AGame::executeTurn()
@@ -665,14 +651,14 @@ void AGame::saveGame()
 		return;
 	}
 	if (game->campaignName == "") {
-		debugStr("There is no campaign name. The game will not be saved");
+		debugStr("AGame::saveGame(): There is no campaign name. The game will not be saved");
 		return;
 	}
 	if (!isAcceptingCommands()) {
-		debugStr("Game was not accepting commands. Could not save game");
+		debugStr("AGame::saveGame(): Game was not accepting commands.  The game will not be saved");
 		return;
 	}
-	auto save = CREATE_GAME_SAVE;
+	auto save = Cast<UCampaignSave>(UGameplayStatics::CreateSaveGameObject(UCampaignSave::StaticClass()));
 	save->numAccounts = game->accounts.Num();
 	save->numUnits = game->units.Num();
 	for (auto i : game->accounts) {

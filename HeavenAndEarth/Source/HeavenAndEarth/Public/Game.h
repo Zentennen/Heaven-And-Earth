@@ -1,35 +1,12 @@
 #pragma once
 #include "GameFramework/Actor.h"
+#include "CampaignSave.h"
 #include "Game.generated.h"
 
 class AAccount;
 class AUnit;
 class APC;
-
-#define LOAD_GAME Cast<UCampaignSave>(UGameplayStatics::LoadGameFromSlot(getSaveName(), 0))
-#define LOAD_GAME_STATIC Cast<UCampaignSave>(UGameplayStatics::LoadGameFromSlot(game->getSaveName(), 0))
-#define CREATE_GAME_SAVE Cast<UCampaignSave>(UGameplayStatics::CreateSaveGameObject(UCampaignSave::StaticClass()))
-
-USTRUCT(BlueprintType)
-struct FTileColumn {
-	GENERATED_BODY()
-	UPROPERTY(BlueprintReadWrite, EditAnywhere) TArray<uint8> costs;
-	UPROPERTY(BlueprintReadWrite, EditAnywhere) TArray<uint8> flags;
-	UPROPERTY(BlueprintReadWrite, EditAnywhere) TArray<AUnit*> units;
-	FTileColumn() {
-
-	}
-	FTileColumn(const int32& rows) {
-		costs.Init(60, rows);
-		flags.Init(0, rows);
-		units.Init(nullptr, rows);
-	}
-	FTileColumn(const int32& rows, const uint8& cost) {
-		costs.Init(cost, rows);
-		flags.Init(0, rows);
-		units.Init(nullptr, rows);
-	}
-};
+struct FUnitStats;
 
 UCLASS()
 class HEAVENANDEARTH_API AGame : public AActor

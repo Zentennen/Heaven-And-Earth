@@ -8,7 +8,6 @@ public class HeavenAndEarthTarget : TargetRules
 	public HeavenAndEarthTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Game;
-
 		ExtraModuleNames.AddRange( new string[] { "HeavenAndEarth" } );
 	}
 }

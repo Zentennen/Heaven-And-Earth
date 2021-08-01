@@ -169,7 +169,6 @@ public:
 	//UFUNCTION() void moveAlongPath(const TArray<FGridIndex>& p, const bool& replaceCurrentOrders);
 	UFUNCTION(BlueprintPure) FUnitStats getStats() const;
 	UFUNCTION(BlueprintPure) FUnitData getData() const;
-	UFUNCTION(BlueprintPure) FString getSaveName() const;
 	UFUNCTION(BlueprintPure) int32 getAliveTotal() const;
 	UFUNCTION(BlueprintPure) int32 getPersonTotal() const;
 	UFUNCTION(BlueprintPure) int32 getMaxMovementPerTurn() const;

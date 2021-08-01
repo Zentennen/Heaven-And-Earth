@@ -1,5 +1,5 @@
 #include "HexMarker.h"
-#include "Config.h"
+#include "HAE.h"
 #include "Game.h"
 
 AHexMarker::AHexMarker()

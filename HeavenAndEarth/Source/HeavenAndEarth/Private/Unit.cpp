@@ -1,8 +1,9 @@
 #include "Unit.h"
 #include "Game.h"
+#include "PC.h"
 #include "Engine.h"
 #include "CampaignSave.h"
-#include "UnrealNetwork.h"
+#include "Net/UnrealNetwork.h"
 #include "..\Public\Unit.h"
 
 void FArmorLayer::damage(FArmorLayer layer, uint32 dmg)
@@ -420,10 +421,5 @@ void AUnit::load(const int32& i, UCampaignSave* saveGame)
 	SetActorLocation(AGame::gridIndexToVector(data.position), false, nullptr, tele);
 	onOrdersChanged();
 	onPathChanged();
-}
-
-FString AUnit::getSaveName() const
-{
-	return FString(TEXT("Unit ")) + FString::FromInt(id) + FString(TEXT(" ")) + AGame::getCampaignName();
 }
 

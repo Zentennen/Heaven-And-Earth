@@ -2,7 +2,7 @@
 #include "Game.h"
 #include "LoginSave.h"
 #include "Kismet/GameplayStatics.h"
-#include "UnrealNetwork.h"
+#include "Net/UnrealNetwork.h"
 #include "..\Public\PC.h"
 
 void APC::BeginPlay() {
@@ -87,8 +87,6 @@ void APC::requestAccount_Implementation(const FString& username, const FString& 
 
 bool APC::tryLogin_Validate(const FString& username, const FString& password)
 {
-	if (username == "") printMsg("Kicked: Username cannot be empty");
-	if (password == "") printMsg("Kicked: Password cannot be empty");
 	if (!AGame::canLogin(this, username, password)) printMsg("Kicked: Incorrect password");
 	return username != "" && password != "" && AGame::canLogin(this, username, password);
 }
